@@ -16,10 +16,9 @@ https://www.vecteezy.com/search?qterm=sports-and-cars&content_type=video
 
 5. Caching: public assets become public. Whilst private assets are protected.
 
-## Update 1
-Initial chat routes for the backend are done.
-Core concept of a focus group with agents using crewAI is working.
-ChatGPT function call is working and calling the crew.
+# Updates
+
+[Update history ->](https://github.com/brunoboto96/agency_video_chat/blob/main/updates.md)
 
 ## TODO
 - Add more functionality
