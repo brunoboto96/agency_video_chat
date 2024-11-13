@@ -7,7 +7,7 @@ https://www.vecteezy.com/search?qterm=sports-and-cars&content_type=video
 - video > source (save url)
 - video embeddings (TODO: pick a model for this)
 
-3. Score the videos that most align with the company ideals.
+3. Score the videos that most align with the agency ideals.
 - Via embeddings
 - Feed a few documents for RAG
 
@@ -15,3 +15,26 @@ https://www.vecteezy.com/search?qterm=sports-and-cars&content_type=video
 (This could be a side by side agents preview of the final document)
 
 5. Caching: public assets become public. Whilst private assets are protected.
+
+# Update 1
+Initial chat routes for the backend are done.
+Core concept of a focus group with agents using crewAI is working.
+ChatGPT function call is working and calling the crew.
+
+# TODO
+- Add more functionality
+- Fix up and review the system prompts and similar.
+- Basic UI for chat
+- UI: Build an agency profile
+- UI: Upload videos
+- Create embeddings from assets
+- Integrate a nosql db with vector search support: chromadb + sqlite || (mongodb or redis[2in1]) ??
+- Add a function and then provide a tool on an agent to collect royalty free videos from vectoryeezy and store their embeddings, original url and description
+
+...
+
+- Host in cloud functions
+- Use functions-framework for serverless
+
+
+
