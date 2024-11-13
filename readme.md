@@ -30,7 +30,9 @@ ChatGPT function call is working and calling the crew.
 - Create embeddings from assets
 - Integrate a nosql db with vector search support: chromadb + sqlite || (mongodb or redis[2in1]) ??
 - Add a function and then provide a tool on an agent to collect royalty free videos from vectoryeezy and store their embeddings, original url and description
+
 ...
+
 - Host in cloud functions
 - Use functions-framework for serverless
 
