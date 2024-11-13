@@ -208,7 +208,7 @@ additional_context = {
 }
 
 
-
 @app.get("/test")
 async def test():
-    return await chat(user_prompt, [], False, additional_context)[-1]["content"]
+    result = await chat(user_prompt, [], False, additional_context)
+    return {"response": result[-1]["content"]}
