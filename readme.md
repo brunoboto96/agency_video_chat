@@ -1,4 +1,6 @@
-# Idea
+# Video Search Engine for Agencies
+
+## Idea
 1. Input agency information (ie. advertising agencies)
 - *Upload a short video to set the profile about the agency media.
 
@@ -16,7 +18,7 @@ https://www.vecteezy.com/search?qterm=sports-and-cars&content_type=video
 
 5. Chat with the video as context or Button -> Focus Group Analysis
 
-# Updates
+## Updates
 
 [Update history ->](https://github.com/brunoboto96/agency_video_chat/blob/main/updates.md)
 
