@@ -188,11 +188,12 @@ from audio_analysis import analyse_audio
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-async def collect_videos(query: str, n: int):
+async def collect_videos(query: str, n: int, offset: int = 0):
     """
     Description: Find and collect videos that are relevant to the given agency information.
     """
-
+    videos_to_collect = n
+    n = n + offset
     query = query.replace(" ", "%20")
     query_builder = f"https://www.pexels.com/search/videos/{query}/"
 
@@ -248,7 +249,9 @@ async def collect_videos(query: str, n: int):
         print(f"Found {len(video_elements)} video elements")
         
         video_links = []
-        for source in video_elements[:n]:
+        for source in video_elements[offset:n]:
+            if len(video_links) >= videos_to_collect:
+                break
             try:
                 video_link = source.get_attribute("src")
                 if video_link:
@@ -296,7 +299,7 @@ async def video_analyse(video_link):
     collection = chroma_client.get_collection(name="video_embeddings")
     results = collection.get( ids=[video_link])
     if results['ids'] != []:
-        print("Video already in database", results)
+        # print("Video already in database", results)
         return results["metadatas"][0]
     
 
@@ -313,7 +316,7 @@ async def video_analyse(video_link):
         "audio_context": audio_context,
         "text_context": "",
     }
-    print('Video and audio analysis completed:', response)
+    # print('Video and audio analysis completed:', response)
     collection.add(documents=[video_context], metadatas=[response], ids=[video_link])
     return response
 
@@ -420,6 +423,10 @@ tools = [
                     "n": {
                         "type": "number",
                         "description": "Number of videos to collect.",
+                    },
+                    "offset": {
+                        "type": "number",
+                        "description": "Offset for the number of videos to collect (default: 0).",
                     },
                 },
                 "required": [

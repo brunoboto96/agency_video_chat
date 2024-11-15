@@ -52,34 +52,30 @@ async def chat(
     {json.dumps(additional_context, indent=2)}
     """
     # print('context_prompt', context_prompt)
-    message_return = messages
-    message_return.append({"role": "user", "content": user_input})
     if not_chat == False:
-        messages = [
+        messages_return = [
             {"role": "system", "content": system_prompt},
             {"role": "system", "content": context_prompt},
-            *message_return,
+            *messages,
             {"role": "user", "content": user_input},
         ]
     else:
-        messages = [{"role": "user", "content": user_input}]
+        messages_return = [{"role": "user", "content": user_input}]
 
     while True:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=messages,
+            messages=messages_return,
             tools=tools,
             stream=False,
             max_tokens=1600,
             temperature=0.2,
         )
         message = response.choices[0].message
-        print("message", message)
+        # print("message", message)
         print("---")
 
         if message.tool_calls and len(message.tool_calls) > 0:
-            print("function call", message)
-            print("---")
             function_call = message.tool_calls[0].function
             function_name = function_call.name
             function_args = json.loads(function_call.arguments)
@@ -88,35 +84,22 @@ async def chat(
             if function_name in function_map:
                 print("calling function: ", function_name)
                 function_result = await function_map[function_name](**function_args)
-                print("function result", function_result)
-                messages.append(
+                # print("function result", function_result)
+                messages_return.append(
                     {
                         "role": "assistant",
                         "content": None,
                         "function_call": function_call,
                     }
                 )
-                messages.append(
+                messages_return.append(
                     {
                         "role": "function",
                         "name": function_name,
                         "content": function_result,
                     }
                 )
-                message_return.append(
-                    {
-                        "role": "assistant",
-                        "content": None,
-                        "function_call": function_call,
-                    }
-                )
-                message_return.append(
-                    {
-                        "role": "function",
-                        "name": function_name,
-                        "content": function_result,
-                    }
-                )
+               
             else:
                 print(f"Function {function_name} not found.")
         else:
@@ -124,9 +107,9 @@ async def chat(
             print("_" * 50)
             print(message.content)
             print("_" * 50)
-            # return message.content
-            message_return.append({"role": "assistant", "content": message.content})
-            return message_return
+            messages_return.append({"role": "assistant", "content": message.content})
+            return messages_return
+
 
 
 ## FastAPI
@@ -177,7 +160,7 @@ async def test():
     # tmp: Testing 
     agency_info = {
         "agency_name": "PendulumF1",
-        "agency_type": "Advertising Agency",
+        "agency_description": "Advertising Agency",
         "industry": "Formula 1 Racing",
         "location": "New York",
         "keywords": ["Formula 1", "Racing Cars", "Advertising"],
@@ -227,14 +210,20 @@ class AgencyInfo(BaseModel):
     agency_info: dict
 
 @app.post("/collect/videos")
-async def collect_videos(agency: AgencyInfo, n: int = 5):
+async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
     print(agency, n)
     user_prompt = f"""
-    Collect {n} videos that are relevant to:
+    ____
+    The offset is:
+    {offset}
+    ____
+    Collect {n} and return videos that are most relevant to:
     ____
     {json.dumps(agency.agency_info)}
     ____
     The query should be simple and based on the agency's industry, target audience, and keywords.
+    ____
+    If the function returns more than {n} videos, return only the top number {n} videos based on relevancy.
     ____
     Your response must be formatted as json as such:
     {{
@@ -253,6 +242,7 @@ async def collect_videos(agency: AgencyInfo, n: int = 5):
     """
     res = await chat(user_prompt, [], True, agency.agency_info)
     final_response = res[-1]["content"]
+    
     # Extract JSON string from the final response
     json_pattern = r"\{.*\}"
     match = re.search(json_pattern, final_response, re.DOTALL)
