@@ -176,6 +176,149 @@ async def focus_group(
     return response.raw
 
 
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import asyncio
+from audio_analysis import analyse_audio
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+async def collect_videos(query: str, n: int):
+    """
+    Description: Find and collect videos that are relevant to the given agency information.
+    """
+
+    query = query.replace(" ", "%20")
+    query_builder = f"https://www.pexels.com/search/videos/{query}/"
+
+    chrome_options = Options()
+    # Updated headless mode configuration
+    chrome_options.add_argument("--headless=new")  # Use new headless mode
+    
+    # Additional required options for stable headless operation
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920x1080")
+    
+    # Additional options to improve stability
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-notifications")
+    chrome_options.add_argument("--disable-infobars")
+
+    # Add user agent to avoid detection
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+    # Set up ChromeDriver Service with logging
+    service = Service(ChromeDriverManager().install())
+    driver = None
+
+    try:
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        print(f"Navigating to URL: {query_builder}")
+        
+        # Set page load timeout
+        driver.set_page_load_timeout(30)
+        driver.get(query_builder)
+
+        # Wait for initial page load
+        time.sleep(5)  # Allow time for dynamic content to load
+
+        # Scroll down to load more videos
+        scroll_pause_time = 2
+        screen_height = driver.execute_script("return window.screen.height;")
+        i = 1
+        
+        while i < 3:  # Adjust number of scrolls as needed
+            driver.execute_script(f"window.scrollTo(0, {screen_height * i});")
+            time.sleep(scroll_pause_time)
+            i += 1
+
+        # Wait for video elements with explicit wait
+        wait = WebDriverWait(driver, 20)
+        video_elements = wait.until(
+            EC.presence_of_all_elements_located((By.TAG_NAME, "video"))
+        )
+        
+        print(f"Found {len(video_elements)} video elements")
+        
+        video_links = []
+        for source in video_elements[:n]:
+            try:
+                video_link = source.get_attribute("src")
+                if video_link:
+                    video_links.append(video_link)
+                    print(f"Found video link: {video_link}")
+            except Exception as e:
+                print(f"Error extracting video link: {str(e)}")
+                continue
+
+        if not video_links:
+            print("No video links found")
+            return "No results found"
+
+        # Process video links asynchronously
+        video_analysis = await asyncio.gather(
+            *[video_analyse(video_link) for video_link in video_links]
+        )
+        print(f"Completed video analysis for {len(video_analysis)} videos")
+
+        return str(video_analysis)
+
+    except Exception as e:
+        print(f"Error during video collection: {str(e)}", exc_info=True)
+        return f"Error occurred: {str(e)}"
+
+    finally:
+        if driver:
+            driver.quit()
+            print("Browser session closed")
+
+
+
+from video_analysis import analyse_video
+from db import chroma_client
+
+
+async def video_analyse(video_link):
+    """
+    Placeholder for video analysis logic
+    """
+
+    print(f"Analyzing video link: {video_link}")
+
+    # check if video is already in the database
+    collection = chroma_client.get_collection(name="video_embeddings")
+    results = collection.get( ids=[video_link])
+    if results['ids'] != []:
+        print("Video already in database", results)
+        return results["metadatas"][0]
+    
+
+    video_context = analyse_video(
+        video_link,
+        "Describe this video in detail and the style of editing and shooting.",
+    )
+    
+    audio_context = analyse_audio(video_link)
+    
+    response = {
+        "link": video_link,
+        "video_context": video_context,
+        "audio_context": audio_context,
+        "text_context": "",
+    }
+    print('Video and audio analysis completed:', response)
+    collection.add(documents=[video_context], metadatas=[response], ids=[video_link])
+    return response
+
+
+
 tools = [
     {
         "type": "function",
@@ -262,9 +405,35 @@ tools = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "collect_videos",
+            "description": "Find and collect videos that are relevant to the given agency information.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "keywords to search for relevant videos.",
+                    },
+                    "n": {
+                        "type": "number",
+                        "description": "Number of videos to collect.",
+                    },
+                },
+                "required": [
+                    "query",
+                    "n",
+                ],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
 function_map = {
     "focus_group": focus_group,
+    "collect_videos": collect_videos,
 }

@@ -1,7 +1,5 @@
-import json
-
+import json, re, os
 from apis import *
-
 from openai import OpenAI
 
 
@@ -16,7 +14,7 @@ from openai import OpenAI
 # firebase_admin.initialize_app(cred)
 # db = firestore.client()
 
-
+os.environ.setdefault("REPLICATE_API_TOKEN", get_secret("REPLICATE_API_TOKEN"))
 client = OpenAI(
     organization="org-88cYAMgEF0BLqHuvPB0LEphR",
     project="proj_KfMHXeZRRa8G5CcVDMc981tP",
@@ -131,6 +129,8 @@ async def chat(
             return message_return
 
 
+## FastAPI
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -171,44 +171,107 @@ async def chat_endpoint(message_history: Message, agency_info: dict):
     return chat_response
 
 
-agency_info = {
-    "agency_name": "PendulumF1",
-    "agency_type": "Advertising Agency",
-    "industry": "Formula 1 Racing",
-    "location": "New York",
-    "keywords": ["Formula 1", "Racing Cars", "Advertising"],
-    "target_audience": ["Formula 1 Fans", "Racing Enthusiasts"],
-}
-
-
-user_prompt = f"""
-I would like to find some videos about formula 1 or racing cars.
-"""
-
-user_prompt = f"""
-Compare these videos and tell me which one is better for my agency.
-"""
-
-additional_context = {
-    "agency_info": json.dumps(agency_info),
-    "video_context": [
-        {"description": "The video is about formula 1 racing cars.", "type": "video"},
-        {"description": "The video is about racing cars.", "type": "video"},
-        {
-            "description": "The video is about a group of dogs playing in the park.",
-            "type": "video",
-        },
-    ],
-    "audio_context": [
-        {"description": "Racing car noises", "type": "audio"},
-        {"description": "Racing car noises", "type": "audio"},
-        {"description": "Dogs barking", "type": "audio"},
-    ],
-    "text_context": [],
-}
-
 
 @app.get("/test")
 async def test():
-    result = await chat(user_prompt, [], False, additional_context)
-    return {"response": result[-1]["content"]}
+    # tmp: Testing 
+    agency_info = {
+        "agency_name": "PendulumF1",
+        "agency_type": "Advertising Agency",
+        "industry": "Formula 1 Racing",
+        "location": "New York",
+        "keywords": ["Formula 1", "Racing Cars", "Advertising"],
+        "target_audience": ["Formula 1 Fans", "Racing Enthusiasts"],
+    }
+
+
+    user_prompt = f"""
+    I would like to find some videos about formula 1 or racing cars.
+    """
+
+    user_prompt = f"""
+    Compare these videos and tell me which one is better for my agency.
+    """
+
+    additional_context = {
+        "agency_info": json.dumps(agency_info),
+        "video_context": [
+            {"description": "The video is about formula 1 racing cars.", "type": "video"},
+            {"description": "The video is about racing cars.", "type": "video"},
+            {
+                "description": "The video is about a group of dogs playing in the park.",
+                "type": "video",
+            },
+        ],
+        "audio_context": [
+            {"description": "Racing car noises", "type": "audio"},
+            {"description": "Racing car noises", "type": "audio"},
+            {"description": "Dogs barking", "type": "audio"},
+        ],
+        "text_context": [],
+    }
+
+    # result = await chat(user_prompt, [], False, additional_context)
+    # return {"response": result[-1]["content"]}
+    
+    # return await video_analyse('https://videos.pexels.com/video-files/29219715/12613308_360_640_30fps.mp4')
+    
+    #from audio_analysis import analyse_audio
+    # response = analyse_audio('https://videos.pexels.com/video-files/16605636/16605636-sd_640_360_30fps.mp4')
+    # return {"response": response}
+    
+    return {"message": "Test successful"}
+
+
+class AgencyInfo(BaseModel):
+    agency_info: dict
+
+@app.post("/collect/videos")
+async def collect_videos(agency: AgencyInfo, n: int = 5):
+    print(agency, n)
+    user_prompt = f"""
+    Collect {n} videos that are relevant to:
+    ____
+    {json.dumps(agency.agency_info)}
+    ____
+    The query should be simple and based on the agency's industry, target audience, and keywords.
+    ____
+    Your response must be formatted as json as such:
+    {{
+        "videos": 
+        [
+            {{
+                "link": (url link to the video),
+                "video_context": (description of the video),
+                "audio_context": (description of the audio, if not provided leave this as an empty string),
+                "text_context": (description of the text, since its audio leave this empty string),
+                "relevancy_score": (int 1-10 representing how relevant the video is to the agency based on the analysis)
+            }},
+            ...
+        ]
+    }}
+    """
+    res = await chat(user_prompt, [], True, agency.agency_info)
+    final_response = res[-1]["content"]
+    # Extract JSON string from the final response
+    json_pattern = r"\{.*\}"
+    match = re.search(json_pattern, final_response, re.DOTALL)
+    if match:
+        json_str = match.group()
+    else:
+        json_str = None
+
+    # Parse the JSON string
+    if json_str:
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print("Error parsing JSON:", e, final_response)
+            data = None
+    print(data)
+    return data
+
+   
+
+
+
