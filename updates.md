@@ -74,7 +74,8 @@ Collecting videos is done using Selenium and BeautifulSoup
 ## Update 4
 Started the frontend in React + Tailwind
 
-
+## Update 5
+Frontend + Backend fully functional ✅
 
 
 [<- back to readme](https://github.com/brunoboto96/agency_video_chat/blob/main/readme.md)
