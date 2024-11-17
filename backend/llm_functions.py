@@ -52,6 +52,7 @@ class VideoFocusGroupCrew:
     def tech_review_task(self) -> Task:
         return Task(
             config=self.tasks_config["tech_enthusiast_task"],
+            async_execution=True,
         )
 
     @agent
@@ -66,6 +67,7 @@ class VideoFocusGroupCrew:
     def young_social_media_influencer_task(self) -> Task:
         return Task(
             config=self.tasks_config["young_social_media_influencer_task"],
+            async_execution=True,
         )
 
     @agent
@@ -80,6 +82,7 @@ class VideoFocusGroupCrew:
     def business_professional_task(self) -> Task:
         return Task(
             config=self.tasks_config["business_professional_task"],
+            async_execution=True,
         )
 
     @agent
@@ -94,6 +97,7 @@ class VideoFocusGroupCrew:
     def family_focus_viewer_task(self) -> Task:
         return Task(
             config=self.tasks_config["family_focus_viewer_task"],
+            async_execution=True,
         )
 
     @agent
@@ -108,6 +112,7 @@ class VideoFocusGroupCrew:
     def environmentalist_task(self) -> Task:
         return Task(
             config=self.tasks_config["environmentalist_task"],
+            async_execution=True,
         )
 
     @agent
@@ -122,6 +127,7 @@ class VideoFocusGroupCrew:
     def senior_expert_task(self) -> Task:
         return Task(
             config=self.tasks_config["senior_expert_task"],
+            async_execution=True,
         )
 
     @agent
@@ -297,13 +303,14 @@ async def video_analyse(video_link):
 
     # check if video is already in the database
     collection = chroma_client.get_collection(name="video_embeddings")
-    results = collection.get( ids=[video_link])
+    results = collection.get(ids=[video_link])
+
     if results['ids'] != []:
-        # print("Video already in database", results)
+        print("Video already in database", results)
         return results["metadatas"][0]
     
 
-    video_context = analyse_video(
+    video_context = await analyse_video(
         video_link,
         "Describe this video in detail and the style of editing and shooting.",
     )
@@ -320,6 +327,35 @@ async def video_analyse(video_link):
     collection.add(documents=[video_context], metadatas=[response], ids=[video_link])
     return response
 
+
+
+async def analyse_videos(video_links: list, query: str) -> str:
+    """
+    Analyse a list of video links asynchronously
+    """
+
+    print(f"Analyzing video links: {video_links}")
+
+    results = await asyncio.gather(
+        *[analyse_video(video_link, query) for video_link in video_links]
+    )
+    collection = chroma_client.get_collection(name="video_embeddings")
+    documents = collection.get(ids=video_links)
+
+    new_documents = []
+    for idx, result in enumerate(results):
+        # Grow the video_context with the result
+        new_documents.append(documents["documents"][idx] + result)
+    
+    # TODO: Add audio analysis
+    
+    # Update the documents in the collection with the new extended context
+    collection.update(
+        ids=video_links,
+        documents=[*new_documents],
+    )
+
+    return str(new_documents)
 
 
 tools = [
@@ -437,10 +473,39 @@ tools = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyse_videos",
+            "description": "Analyse a list of video links asynchronously (VQA).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "video_links": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                        },
+                        "description": "List of video links to analyse.",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Query for VQA.",
+                    },
+                },
+                "required": [
+                    "video_links",
+                    "query",
+                ],
+                "additionalProperties": False,
+            },
+        },
+    }
 ]
 
 
 function_map = {
     "focus_group": focus_group,
     "collect_videos": collect_videos,
+    "analyse_videos": analyse_videos,
 }

@@ -1,6 +1,7 @@
 import json, re, os
-from apis import *
+from llm_functions import *
 from openai import OpenAI
+from uuid import uuid4
 
 
 # import firebase_admin
@@ -23,7 +24,7 @@ client = OpenAI(
 
 
 system_prompt = f"""
-You are Pendulum's friendly and insightful virtual assistant. Your role is to provide assistance as a digital brain. You have access to a wide range of tools and resources to help you provide accurate and helpful information to users. Your primary goal is to assist users in finding answers to their questions and guiding them through various tasks.
+You are a friendly and insightful virtual assistant. Your role is to provide assistance as a digital brain. You have access to a wide range of tools and resources to help you provide accurate and helpful information to users. Your primary goal is to assist users in finding answers to their questions and guiding them through various tasks.
 
 Use the user’s media asset results to craft responses that are tailored to their unique profile.
 You also have access to the agency info. Use this information to provide personalized responses to the user's queries.
@@ -35,6 +36,7 @@ Make sure you provide answers in MD format. Be conversational and engaging.
 Try to find your answer within the context provided. 
 Use the supplied tools in order to get more context about the user. 
 Use emojis to make the conversation more engaging. Emojis should be in unicode format.
+You can use VQA to get more information about the videos, incentivize the user to ask more questions about the videos and let the user know the more questions they ask the more information you can provide.
 """
 
 
@@ -118,6 +120,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi import File, UploadFile
 
 
 app = FastAPI()
@@ -153,6 +156,14 @@ async def chat_endpoint(message_history: Message, agency_info: dict):
     )
     return chat_response
 
+@app.post("/video/analysis")
+async def video_file_analysis(video_file: UploadFile = File(...)):
+    random_name = uuid4()
+    tmp_path = f"./tmp/{random_name}.{video_file.filename.split('.')[-1]}"
+    with open(tmp_path, "wb") as buffer:
+        buffer.write(video_file.file.read())
+    
+    return {"output": await analyse_video(open(tmp_path, "rb"), "What is happening in this video?")}
 
 
 @app.get("/test")

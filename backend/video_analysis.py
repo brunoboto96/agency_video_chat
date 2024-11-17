@@ -1,6 +1,6 @@
 import replicate
 
-def analyse_video(video_path, question) -> str:
+async def analyse_video(video_path, question) -> str:
     print('Analyzing video:', video_path)
     
     input = {
@@ -27,6 +27,6 @@ def analyse_video(video_path, question) -> str:
     # print('Prediction completed:', output)
     unique_sentences = list(dict.fromkeys(output.split('. ')))
     cleaned_output = '. '.join(unique_sentences)
-    # print('Cleaned output:', cleaned_output)
+    print('Cleaned output:', cleaned_output)
     
     return cleaned_output

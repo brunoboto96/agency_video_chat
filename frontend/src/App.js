@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import Switch from "@mui/material/Switch";
@@ -19,6 +19,10 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import CloseIcon from "@mui/icons-material/Close";
+
+import { styled } from "@mui/material/styles";
 
 function App() {
 	const [open, setOpen] = React.useState(false);
@@ -31,6 +35,18 @@ function App() {
 	const handleClose = () => {
 		setOpen(false);
 	};
+
+	const VisuallyHiddenInput = styled("input")({
+		clip: "rect(0 0 0 0)",
+		clipPath: "inset(50%)",
+		height: 1,
+		overflow: "hidden",
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		whiteSpace: "nowrap",
+		width: 1,
+	});
 	// const [agencyName, setAgencyName] = useState("");
 	// const [agencyDescription, setAgencyDescription] = useState("");
 	// const [industry, setIndustry] = useState("");
@@ -44,13 +60,13 @@ function App() {
 	const [industry, setIndustry] = useState("Healthcare");
 	const [location, setLocation] = useState("UK");
 	const [keywords, setKeywords] = useState(
-		"healthcare, womens health, education and training"
+		"healthcare, womens health, education and training, contraception, menopause, abortion"
 	);
 	const [targetAudience, setTargetAudience] = useState(
 		"Doctors, GPs, nurses, midwifes, pharmacists, nhs"
 	);
 	// const baseUrl = "http://localhost:8000";
-  const baseUrl = " https://4bbe-38-242-164-43.ngrok-free.app"
+	const baseUrl = "https://fadf-38-242-164-43.ngrok-free.app";
 	const [counter, setCounter] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const loadingMessages = [
@@ -83,6 +99,8 @@ function App() {
 
 	const [timeLeft, setTimeLeft] = useState(140);
 
+	const [uploadResults, setUploadResults] = useState(null);
+
 	// Update the countdown every 1 second
 	useEffect(() => {
 		let interval;
@@ -113,12 +131,20 @@ function App() {
 		setMessageCounter(0);
 		setLoading(true);
 	};
+	const chatWindowRef = useRef(null);
+
+	useEffect(() => {
+		if (chatWindowRef.current) {
+			chatWindowRef.current.scrollTop =
+				chatWindowRef.current.scrollHeight;
+		}
+	}, [chatMessages]);
 
 	const stopCountdown = () => {
 		setLoading(false);
 	};
 
-	const [nrVideosToFetch, setNrVideosToFetch] = useState(5);
+	const [nrVideosToFetch, setNrVideosToFetch] = useState(6);
 	const [offsetNrVideosToFetch, setOffsetNrVideosToFetch] = useState(0);
 	const [offsetVideoLinks, setOffsetVideoLinks] = useState([]);
 	const handleSubmit = async () => {
@@ -190,7 +216,7 @@ function App() {
 
 	const sendMessage = async (message) => {
 		setLoading(true);
-    const currentMessages = chatMessages
+		const currentMessages = chatMessages;
 		setChatMessages((prevMessages) => [
 			...prevMessages,
 			{
@@ -202,10 +228,21 @@ function App() {
 				content: "💬 ..",
 			},
 		]);
-    setUserInput("");
+		setUserInput("");
 
 		// call the backend to get the response
 		try {
+			const videosToSend = videoResults;
+			if (uploadedFile) {
+				videosToSend.push({
+					link: uploadedFile,
+					relevancy_score: uploadResults["relevancy_score"],
+					video_context: uploadResults["video_context"],
+					audio_context: uploadResults["audio_context"],
+					text_content: "User uploaded video",
+				});
+			}
+
 			const response = await fetch(baseUrl + "/chat", {
 				method: "POST",
 				headers: {
@@ -223,7 +260,7 @@ function App() {
 						location,
 						keywords,
 						target_audience: targetAudience,
-						videos_selected: videoResults,
+						videos_selected: videosToSend,
 					},
 				}),
 			});
@@ -246,7 +283,6 @@ function App() {
 		}
 	};
 
-
 	const resetChat = () => {
 		// Confirm dialog
 		setOpen(false);
@@ -262,6 +298,20 @@ function App() {
 		setChatState(true);
 	};
 
+	// // Replace '\n' with double spaces (for Markdown interpretation)
+	// const formatMessageForMarkdown = (messageContent) => {
+	// 	console.log("messageContent", messageContent);
+	// 	try {
+	// 		console.log(1);
+	// 		const finalmessage = messageContent.replace(/\n/g, "&nbsp;  ");
+	// 		console.log("finalmessage", finalmessage);
+	// 		return finalmessage;
+	// 	} catch (e) {
+	// 		console.log("error", e);
+	// 		return messageContent;
+	// 	}
+	// };
+
 	const [timesShuffled, setTimesShuffled] = useState(1);
 	const reshuffleVideos = () => {
 		const selectedVideos = videoResults.videos.filter(
@@ -271,19 +321,72 @@ function App() {
 		setVideoResults({ videos: selectedVideos });
 		const newLength = selectedVideos.length;
 		console.log("newLength", newLength);
-		setNrVideosToFetch(5 - newLength);
+		setNrVideosToFetch(6 - newLength);
 		setOffsetVideoLinks(selectedVideos.map((video) => video.link));
 		setTimesShuffled(timesShuffled + 1);
 		setVideoSelected(new Array(newLength).fill(true));
-		setOffsetNrVideosToFetch(5 * timesShuffled + (5 - newLength));
+		setOffsetNrVideosToFetch(6 * timesShuffled + (6 - newLength));
 	};
 
 	useEffect(() => {
-		if (nrVideosToFetch !== 5 || offsetNrVideosToFetch !== 0) {
+		if (nrVideosToFetch !== 6 || offsetNrVideosToFetch !== 0) {
 			handleSubmit();
 		}
 	}, [nrVideosToFetch, offsetNrVideosToFetch]);
 
+	const [uploadedFile, setUploadedFile] = useState(null);
+	const [uploadedFileUrl, setUploadedFileUrl] = useState(null);
+
+	useEffect(() => {
+		if (!uploadedFile) return;
+
+		const uploadVideo = async () => {
+			try {
+				const formData = new FormData();
+				formData.append("video_file", uploadedFile);
+
+				const response = await fetch(`${baseUrl}/video/analysis`, {
+					method: "POST",
+					body: formData,
+				});
+
+				if (!response.ok) {
+					throw new Error(`HTTP error! Status: ${response.status}`);
+				}
+
+				const result = await response.json();
+
+				const results = {
+					relevancy_score: "Not available",
+					video_context: result.output,
+					audio_context: "",
+					text_context: "User uploaded video",
+				};
+
+				setUploadResults(results);
+			} catch (error) {
+				console.error("Error:", error);
+			}
+		};
+
+		uploadVideo();
+
+		// Cleanup when the file changes or component unmounts
+		return () => {
+			setUploadResults(null);
+		};
+	}, [uploadedFile, baseUrl]);
+
+	const removeFile = () => {
+		setUploadedFile(null);
+		setUploadResults(null);
+		setUploadedFileUrl(null);
+	};
+
+	const handleFileUpload = (file) => {
+		setUploadedFile(file);
+		setUploadedFileUrl(URL.createObjectURL(file));
+	};
 	return (
 		<div className="bg-[#454343] h-screen w-screen px-[30px] py-[35px]">
 			<h1 className="text-xl text-white absolute ml-[30px] top-0 left-0">
@@ -295,9 +398,9 @@ function App() {
 			>
 				Restart
 			</button>
-			<div className="border border-white rounded-sm h-full w-full hover:shadow-xl flex bg-[#241f1f]">
+			<div className="gap-4 rounded-md h-full w-full hover:shadow-xl flex bg-[#241f1f] px-3 ">
 				{!videoResults && (
-					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border-r border-white">
+					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border rounded-md border-white">
 						<h1 className="text-center text-white text-2xl">
 							Step 1: Agency Info
 						</h1>
@@ -404,7 +507,7 @@ function App() {
 					</div>
 				)}
 				{videoResults && !chatState && (
-					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border-r border-white">
+					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border rounded-md border-white">
 						<h1 className="text-center text-white text-2xl">
 							Step 2: Video Selection
 						</h1>
@@ -423,7 +526,7 @@ function App() {
 							<button
 								className={`p-5 text-xl bg-slate-200 rounded-md w-[150px] ${
 									videoSelected.filter((selected) => selected)
-										.length == 3
+										.length >= 3
 										? "hover:bg-slate-400"
 										: "bg-slate-400"
 								} text-slate-600`}
@@ -441,7 +544,7 @@ function App() {
 								disabled={
 									loading ||
 									videoSelected.filter((selected) => selected)
-										.length === 3
+										.length >= 3
 								}
 							>
 								Reshuffle
@@ -450,11 +553,12 @@ function App() {
 					</div>
 				)}
 				{videoResults && chatState && (
-					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border-r border-white">
+					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border rounded-md border-white">
 						<div className="flex flex-col gap-5 bg-slate-300 p-5 rounded-md w-full h-full">
 							<div
 								className="flex flex-col space-y-10 overflow-y-auto h-full w-full"
 								id="chatWindow"
+								ref={chatWindowRef}
 							>
 								{chatMessages.map(
 									(message, index) =>
@@ -492,7 +596,7 @@ function App() {
 																: "bg-sky-950 text-slate-200"
 														}`}
 													>
-														<ReactMarkdown>
+														<ReactMarkdown className="whitespace-break-spaces">
 															{message.content}
 														</ReactMarkdown>
 													</div>
@@ -526,7 +630,11 @@ function App() {
 										disabled={loading}
 									>
 										<InterpreterModeIcon
-											onClick={() => sendMessage("Please evaluate the selected videos via the Focus Group")}
+											onClick={() =>
+												sendMessage(
+													"Please evaluate the selected videos via the Focus Group"
+												)
+											}
 										/>
 									</button>
 								</Tooltip>
@@ -584,7 +692,7 @@ function App() {
 						</div>
 					</div>
 				)}
-				<div className="flex flex-col text-center space-y-5 justify-center  w-1/2 p-5">
+				<div className="flex flex-col text-center space-y-5 justify-center border rounded-md border-white  my-3 w-1/2 p-5">
 					{((!videoResults && !loading) || loading) && (
 						<img
 							src={logo}
@@ -630,7 +738,7 @@ function App() {
 											chatState ||
 											videoSelected.filter(
 												(selected) => selected
-											).length === 3
+											).length >= 3
 										}
 									/>
 									<video
@@ -673,6 +781,86 @@ function App() {
 									</Accordion>
 								</div>
 							))}
+							{chatState &&
+								videoSelected.filter((selected) => selected)
+									.length === 3 &&
+								!uploadResults && (
+									<Button
+										component="label"
+										role={undefined}
+										variant="contained"
+										tabIndex={-1}
+										startIcon={<CloudUploadIcon />}
+										className="w-[350px] h-auto rounded-md"
+									>
+										Upload a Video of your own
+										<VisuallyHiddenInput
+											type="file"
+											onChange={(event) =>
+												handleFileUpload(
+													event.target.files[0]
+												)
+											}
+											accept="video/*"
+										/>
+									</Button>
+								)}
+							{chatState && uploadResults && (
+								<div className="flex flex-col w-[350px] space-y-5 p-5 bg-gray-800 rounded-md border-2 border-green-200">
+									<div className="flex items-center justify-between">
+										<CloseIcon
+											onClick={() => removeFile()}
+										/>
+										<Switch
+											checked={true}
+											className="ml-auto"
+											disable={true}
+										/>
+									</div>
+									<video
+										controls
+										className="w-full max-h-[200px] rounded-md"
+										src={uploadedFileUrl}
+									></video>
+									<small className="font-bold">
+										Relevancy Score:{" "}
+										<span className="font-normal">
+											{uploadResults.relevancy_score}
+										</span>
+									</small>
+									<Accordion>
+										<AccordionSummary
+											expandIcon={<ArrowDownwardIcon />}
+											aria-controls="panel1-content"
+											id="panel1-header"
+										>
+											<Typography>
+												More details
+											</Typography>
+										</AccordionSummary>
+										<AccordionDetails>
+											<div className="text-left flex flex-col space-y-5">
+												<small className="font-bold">
+													Video:{" "}
+													<span className="font-normal">
+														{
+															uploadResults.video_context
+														}
+													</span>
+												</small>
+												<small className="font-bold">
+													Audio:{" "}
+													<span className="font-normal">
+														{
+															uploadResults.audio_context
+														}
+													</span>
+												</small>
+											</div>
+										</AccordionDetails>
+									</Accordion>
+								</div>
+							)}
 						</div>
 					)}
 				</div>
