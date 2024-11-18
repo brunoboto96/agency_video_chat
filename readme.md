@@ -7,6 +7,20 @@ The system also includes a focus group analysis feature, enabling agencies to ga
 - [Frontend](https://agency-video-chat-frontend-583182365017.europe-west2.run.app) 🧑‍💻
 - [Backend](https://agency-video-chat-backend-wwsbodm2ma-nw.a.run.app/docs) 💼
  
+## Tech Stack
+- **Frontend:** Node.js, React, Tailwind, MaterialUI
+- **Backend:** Python, FastAPI
+- **Database:** ChromaDB
+- **AI:** CrewAI, OpenAI
+- **APIs:** Replicate (video analysis model), Selenium
+- **Containerization:** Docker
+- **Deployment:** Google Cloud Run
+- **Version Control:** Git, GitHub
+
+
+## Updates
+
+[Update history ->](https://github.com/brunoboto96/agency_video_chat/blob/main/updates.md)
 
 ## Idea
 1. Input agency information (ie. advertising agencies)
@@ -29,22 +43,49 @@ https://www.pexels.com/search/videos/wine/
 ### Features
 - Caching mechanism prevents from processing video twice.
 
-## Updates
+## Installation
 
-[Update history ->](https://github.com/brunoboto96/agency_video_chat/blob/main/updates.md)
+Follow these steps to set up the project locally:
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/)
+- [Python 3.8+](https://www.python.org/downloads/)
+- [Docker](https://www.docker.com/get-started)
+- [Git](https://git-scm.com/)
+
+### Steps
+
+1. **Clone the Repository**
+
+   ```
+   git clone https://github.com/brunoboto96/agency_video_chat.git
+   cd agency_video_chat
+   ```
+
+2.	Setup Backend
+
+    ```
+    cd backend
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    pip install -r requirements.txt
+    ```
+
+3.	Setup Frontend
+    ```
+    cd ../frontend
+    npm install
+    ```
+
+4.  Add your own env variables, instead of the get_secret() function in llm_functions.py
+
+5.	Run Docker Containers
+Ensure Docker is running, then:
+    ```
+    docker-compose up --build
+    ```
+
 
 ## TODO
-- Add more functionality ✅
-- Fix up and review the system prompts, roles, backstories.. Refine the focus groups ✅
-- Basic UI for chat ✅
-- UI: Build an agency profile ✅
-- UI: Upload videos ✅
-- Create embeddings from assets ✅
-- Add chromadb ✅
-- Add a function and then provide a tool on an agent to collect royalty free videos from Pexel and store their embeddings, original url and description ✅
-- Build Chat ✅
-
-...
-
-- Host in cloud Run ✅ 
-- Host chromadb in CE or Cloud functions and Storage bucket for file persistency
+- Chromadb -> Update to storage bucket for file persistency

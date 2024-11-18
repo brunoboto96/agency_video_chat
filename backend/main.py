@@ -172,58 +172,6 @@ async def video_file_analysis(video_file: UploadFile = File(...)):
     return {"output": output}
 
 
-@app.get("/test")
-async def test():
-    # tmp: Testing
-    agency_info = {
-        "agency_name": "PendulumF1",
-        "agency_description": "Advertising Agency",
-        "industry": "Formula 1 Racing",
-        "location": "New York",
-        "keywords": ["Formula 1", "Racing Cars", "Advertising"],
-        "target_audience": ["Formula 1 Fans", "Racing Enthusiasts"],
-    }
-
-    user_prompt = f"""
-    I would like to find some videos about formula 1 or racing cars.
-    """
-
-    user_prompt = f"""
-    Compare these videos and tell me which one is better for my agency.
-    """
-
-    additional_context = {
-        "agency_info": json.dumps(agency_info),
-        "video_context": [
-            {
-                "description": "The video is about formula 1 racing cars.",
-                "type": "video",
-            },
-            {"description": "The video is about racing cars.", "type": "video"},
-            {
-                "description": "The video is about a group of dogs playing in the park.",
-                "type": "video",
-            },
-        ],
-        "audio_context": [
-            {"description": "Racing car noises", "type": "audio"},
-            {"description": "Racing car noises", "type": "audio"},
-            {"description": "Dogs barking", "type": "audio"},
-        ],
-        "text_context": [],
-    }
-
-    # result = await chat(user_prompt, [], False, additional_context)
-    # return {"response": result[-1]["content"]}
-
-    # return await video_analyse('https://videos.pexels.com/video-files/29219715/12613308_360_640_30fps.mp4')
-
-    # from audio_analysis import analyse_audio
-    # response = analyse_audio('https://videos.pexels.com/video-files/16605636/16605636-sd_640_360_30fps.mp4')
-    # return {"response": response}
-
-    return {"message": "Test successful"}
-
 
 class AgencyInfo(BaseModel):
     agency_info: dict
