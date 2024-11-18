@@ -77,5 +77,9 @@ Started the frontend in React + Tailwind
 ## Update 5
 Frontend + Backend fully functional ✅
 
+## Update 6
+Dockerfiles created
+Hosted on Google Cloud Run
+
 
 [<- back to readme](https://github.com/brunoboto96/agency_video_chat/blob/main/readme.md)

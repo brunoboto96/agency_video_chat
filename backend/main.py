@@ -3,18 +3,6 @@ from llm_functions import *
 from openai import OpenAI
 from uuid import uuid4
 
-
-# import firebase_admin
-# from firebase_admin import credentials, firestore
-
-# cred = get_secret('firebase_cred'])
-# # convert cred str into json
-# cred = credentials.Certificate(json.loads(cred))
-
-
-# firebase_admin.initialize_app(cred)
-# db = firestore.client()
-
 os.environ.setdefault("REPLICATE_API_TOKEN", get_secret("REPLICATE_API_TOKEN"))
 client = OpenAI(
     organization="org-88cYAMgEF0BLqHuvPB0LEphR",
@@ -37,6 +25,7 @@ Try to find your answer within the context provided.
 Use the supplied tools in order to get more context about the user. 
 Use emojis to make the conversation more engaging. Emojis should be in unicode format.
 You can use VQA to get more information about the videos, incentivize the user to ask more questions about the videos and let the user know the more questions they ask the more information you can provide.
+Only when using VQA skip the user uploaded videos (analyse_videos tool). Every other instance also consider the user uploaded videos.
 """
 
 
@@ -81,27 +70,38 @@ async def chat(
             function_call = message.tool_calls[0].function
             function_name = function_call.name
             function_args = json.loads(function_call.arguments)
-            print(function_name, function_args)
+            # print(function_name, function_args)
 
             if function_name in function_map:
                 print("calling function: ", function_name)
-                function_result = await function_map[function_name](**function_args)
-                # print("function result", function_result)
-                messages_return.append(
-                    {
-                        "role": "assistant",
-                        "content": None,
-                        "function_call": function_call,
-                    }
-                )
-                messages_return.append(
-                    {
-                        "role": "function",
-                        "name": function_name,
-                        "content": function_result,
-                    }
-                )
-               
+                try:
+                    function_result = await function_map[function_name](**function_args)
+                    messages_return.append(
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "function_call": function_call,
+                        }
+                    )
+                    messages_return.append(
+                        {
+                            "role": "function",
+                            "name": function_name,
+                            "content": function_result,
+                        }
+                    )
+                    # print("function result", function_result)
+
+                except Exception as e:
+                    print("Error in function call:", e)
+                    messages_return.append(
+                        {
+                            "role": "assistant",
+                            "content": """I apologize for the inconvenience, but it seems, I couldn't complete that task. However, I can help you with insights or suggestions related to your agency.
+                            If you have any specific questions or need assistance with something else, please let me know! 😊""",
+                        }
+                    )
+                    return messages_return
             else:
                 print(f"Function {function_name} not found.")
         else:
@@ -111,7 +111,6 @@ async def chat(
             print("_" * 50)
             messages_return.append({"role": "assistant", "content": message.content})
             return messages_return
-
 
 
 ## FastAPI
@@ -136,7 +135,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 class Message(BaseModel):
     message_history: list
     user_input: str
@@ -156,19 +154,27 @@ async def chat_endpoint(message_history: Message, agency_info: dict):
     )
     return chat_response
 
+
 @app.post("/video/analysis")
 async def video_file_analysis(video_file: UploadFile = File(...)):
     random_name = uuid4()
     tmp_path = f"./tmp/{random_name}.{video_file.filename.split('.')[-1]}"
     with open(tmp_path, "wb") as buffer:
         buffer.write(video_file.file.read())
-    
-    return {"output": await analyse_video(open(tmp_path, "rb"), "What is happening in this video?")}
+
+    output = await analyse_video(
+        open(tmp_path, "rb"), "What is happening in this video?"
+    )
+
+    # remove the temporary file
+    os.remove(tmp_path)
+
+    return {"output": output}
 
 
 @app.get("/test")
 async def test():
-    # tmp: Testing 
+    # tmp: Testing
     agency_info = {
         "agency_name": "PendulumF1",
         "agency_description": "Advertising Agency",
@@ -177,7 +183,6 @@ async def test():
         "keywords": ["Formula 1", "Racing Cars", "Advertising"],
         "target_audience": ["Formula 1 Fans", "Racing Enthusiasts"],
     }
-
 
     user_prompt = f"""
     I would like to find some videos about formula 1 or racing cars.
@@ -190,7 +195,10 @@ async def test():
     additional_context = {
         "agency_info": json.dumps(agency_info),
         "video_context": [
-            {"description": "The video is about formula 1 racing cars.", "type": "video"},
+            {
+                "description": "The video is about formula 1 racing cars.",
+                "type": "video",
+            },
             {"description": "The video is about racing cars.", "type": "video"},
             {
                 "description": "The video is about a group of dogs playing in the park.",
@@ -207,18 +215,19 @@ async def test():
 
     # result = await chat(user_prompt, [], False, additional_context)
     # return {"response": result[-1]["content"]}
-    
+
     # return await video_analyse('https://videos.pexels.com/video-files/29219715/12613308_360_640_30fps.mp4')
-    
-    #from audio_analysis import analyse_audio
+
+    # from audio_analysis import analyse_audio
     # response = analyse_audio('https://videos.pexels.com/video-files/16605636/16605636-sd_640_360_30fps.mp4')
     # return {"response": response}
-    
+
     return {"message": "Test successful"}
 
 
 class AgencyInfo(BaseModel):
     agency_info: dict
+
 
 @app.post("/collect/videos")
 async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
@@ -253,26 +262,18 @@ async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
     """
     res = await chat(user_prompt, [], True, agency.agency_info)
     final_response = res[-1]["content"]
-    
+
+    data = None
     # Extract JSON string from the final response
     json_pattern = r"\{.*\}"
     match = re.search(json_pattern, final_response, re.DOTALL)
     if match:
         json_str = match.group()
-    else:
-        json_str = None
-
-    # Parse the JSON string
-    if json_str:
         try:
             data = json.loads(json_str)
         except json.JSONDecodeError as e:
             print("Error parsing JSON:", e, final_response)
-            data = None
-    print(data)
+    else:
+        print("No JSON found in the response.")
+
     return data
-
-   
-
-
-

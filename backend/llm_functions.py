@@ -39,6 +39,9 @@ class VideoFocusGroupCrew:
     # family_focus_viewer
     # environmentalist
     # senior_expert
+    # art_critic
+    # health_wellness_enthusiast
+    # educator
     # reporting_analyst
     @agent
     def tech_enthusiast(self) -> Agent:
@@ -129,6 +132,51 @@ class VideoFocusGroupCrew:
             config=self.tasks_config["senior_expert_task"],
             async_execution=True,
         )
+        
+    @agent
+    def art_critic(self) -> Agent:
+        return Agent(
+            config=self.agents_config["art_critic"],
+            verbose=True,
+            llm=llm,
+        )
+        
+    @task
+    def art_critic_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["art_critic_task"],
+            async_execution=True,
+        )
+        
+    @agent
+    def health_wellness_enthusiast(self) -> Agent:
+        return Agent(
+            config=self.agents_config["health_wellness_enthusiast"],
+            verbose=True,
+            llm=llm,
+        )
+
+    @task
+    def health_wellness_enthusiast_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["health_wellness_enthusiast_task"],
+            async_execution=True,
+        )
+        
+    @agent
+    def educator(self) -> Agent:
+        return Agent(
+            config=self.agents_config["educator"],
+            verbose=True,
+            llm=llm,
+        )
+        
+    @task
+    def educator_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["educator_task"],
+            async_execution=True,
+        )
 
     @agent
     def reporting_analyst(self) -> Agent:
@@ -160,7 +208,7 @@ async def focus_group(
     video_context: list,
     audio_context: list,
     text_context: list,
-    is_media: bool = False,
+    topic_context: str = 'n videos',
 ):
     """
     Docs: https://docs.crewai.com/introduction
@@ -168,10 +216,10 @@ async def focus_group(
     Description: A focus group is a qualitative research method that involves a group of people who are asked about their perceptions, opinions, beliefs, and attitudes towards a product, service, concept, advertisement, idea, or packaging. The focus group is led by a moderator who guides the discussion and ensures that all participants have an opportunity to express their views.
     """
 
-    print("Inputs:", agency_info, video_context, audio_context, text_context, is_media)
+    print("Inputs:", agency_info, video_context, audio_context, text_context, topic_context)
 
     inputs = {
-        "topic": "media" if is_media else "text",
+        "topic": topic_context,
         "agency_info": agency_info,
         "video_context": video_context,
         "audio_context": audio_context,
@@ -280,7 +328,7 @@ async def collect_videos(query: str, n: int, offset: int = 0):
         return str(video_analysis)
 
     except Exception as e:
-        print(f"Error during video collection: {str(e)}", exc_info=True)
+        print(f"Error during video collection: {str(e)}")
         return f"Error occurred: {str(e)}"
 
     finally:
@@ -428,9 +476,9 @@ tools = [
                         },
                         "description": "List of text context.",
                     },
-                    "is_media": {
-                        "type": "boolean",
-                        "description": "Boolean to indicate if the context is media.",
+                    "topic_context": {
+                        "type": "string",
+                        "description": "Description of what the context is about. ie. 3 videos",
                     },
                 },
                 "required": [
@@ -438,7 +486,7 @@ tools = [
                     "video_context",
                     "audio_context",
                     "text_context",
-                    "is_media",
+                    "topic_context",
                 ],
                 "additionalProperties": False,
             },

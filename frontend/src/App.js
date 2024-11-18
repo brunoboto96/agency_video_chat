@@ -66,7 +66,7 @@ function App() {
 		"Doctors, GPs, nurses, midwifes, pharmacists, nhs"
 	);
 	// const baseUrl = "http://localhost:8000";
-	const baseUrl = "https://fadf-38-242-164-43.ngrok-free.app";
+	const baseUrl = "https://agency-video-chat-backend-wwsbodm2ma-nw.a.run.app";
 	const [counter, setCounter] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const loadingMessages = [
@@ -147,6 +147,7 @@ function App() {
 	const [nrVideosToFetch, setNrVideosToFetch] = useState(6);
 	const [offsetNrVideosToFetch, setOffsetNrVideosToFetch] = useState(0);
 	const [offsetVideoLinks, setOffsetVideoLinks] = useState([]);
+	const [processingVideo, setProcessingVideo] = useState(false);
 	const handleSubmit = async () => {
 		console.log(
 			"nrVideosToFetch",
@@ -230,20 +231,25 @@ function App() {
 		]);
 		setUserInput("");
 
-		// call the backend to get the response
 		try {
-			const videosToSend = videoResults;
-			if (uploadedFile) {
-				videosToSend.push({
-					link: uploadedFile,
-					relevancy_score: uploadResults["relevancy_score"],
-					video_context: uploadResults["video_context"],
-					audio_context: uploadResults["audio_context"],
-					text_content: "User uploaded video",
-				});
+			console.log("Before sendMessage - videoResults:", videoResults);
+			// Create a deep copy of videoResults to prevent duplication
+			let videosToSend = videoResults
+				? {
+						...videoResults,
+						videos: [...videoResults.videos],
+				  }
+				: { videos: [] };
+
+			// Ensure uploadedVideo is added only once based on its unique link
+			if (
+				uploadedVideo &&
+				!videosToSend.videos.some((v) => v.link === uploadedVideo.link)
+			) {
+				videosToSend.videos.push(uploadedVideo);
 			}
 
-			const response = await fetch(baseUrl + "/chat", {
+			const response = await fetch(`${baseUrl}/chat`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -268,14 +274,13 @@ function App() {
 			if (response.ok) {
 				const data = await response.json();
 				if (data === null) {
-					throw new Error("No videos found");
+					throw new Error("No response from the server.");
 				}
 				stopCountdown();
 				setChatMessages(data);
 				console.log("Success:", data);
 			} else {
-				stopCountdown();
-				console.error("Error:", response.statusText);
+				throw new Error(`Error: ${response.statusText}`);
 			}
 		} catch (error) {
 			stopCountdown();
@@ -336,12 +341,14 @@ function App() {
 
 	const [uploadedFile, setUploadedFile] = useState(null);
 	const [uploadedFileUrl, setUploadedFileUrl] = useState(null);
+	const [uploadedVideo, setUploadedVideo] = useState(null);
 
 	useEffect(() => {
-		if (!uploadedFile) return;
+		if (!uploadedFile) return; // Exit if no file is uploaded
 
 		const uploadVideo = async () => {
 			try {
+				setProcessingVideo(true);
 				const formData = new FormData();
 				formData.append("video_file", uploadedFile);
 
@@ -357,36 +364,46 @@ function App() {
 				const result = await response.json();
 
 				const results = {
+					link: uploadedFileUrl,
 					relevancy_score: "Not available",
 					video_context: result.output,
 					audio_context: "",
-					text_context: "User uploaded video",
+					text_content: "User uploaded video",
 				};
 
-				setUploadResults(results);
+				setUploadedVideo(results);
+				setProcessingVideo(false);
 			} catch (error) {
 				console.error("Error:", error);
+				setProcessingVideo(false);
 			}
 		};
 
 		uploadVideo();
 
-		// Cleanup when the file changes or component unmounts
+		// Cleanup: Revoke the object URL when the component unmounts or when a new file is uploaded
 		return () => {
-			setUploadResults(null);
+			if (uploadedFileUrl) {
+				URL.revokeObjectURL(uploadedFileUrl);
+			}
 		};
-	}, [uploadedFile, baseUrl]);
+	}, [uploadedFile, baseUrl, uploadedFileUrl]);
 
 	const removeFile = () => {
+		if (uploadedFileUrl) {
+			URL.revokeObjectURL(uploadedFileUrl);
+		}
 		setUploadedFile(null);
-		setUploadResults(null);
 		setUploadedFileUrl(null);
+		setUploadedVideo(null);
 	};
 
 	const handleFileUpload = (file) => {
+		const url = URL.createObjectURL(file);
 		setUploadedFile(file);
-		setUploadedFileUrl(URL.createObjectURL(file));
+		setUploadedFileUrl(url);
 	};
+
 	return (
 		<div className="bg-[#454343] h-screen w-screen px-[30px] py-[35px]">
 			<h1 className="text-xl text-white absolute ml-[30px] top-0 left-0">
@@ -628,24 +645,22 @@ function App() {
 									<button
 										className="p-2 text-xl bg-slate-200 rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
 										disabled={loading}
+										onClick={() =>
+											sendMessage(
+												"Please run a Focus Group with all the available videos."
+											)
+										}
 									>
-										<InterpreterModeIcon
-											onClick={() =>
-												sendMessage(
-													"Please evaluate the selected videos via the Focus Group"
-												)
-											}
-										/>
+										<InterpreterModeIcon />
 									</button>
 								</Tooltip>
 								<Tooltip title="Restore Chat">
 									<button
 										className="p-2 text-xl bg-slate-200 rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
 										disabled={loading}
+										onClick={() => handleResetChat()}
 									>
-										<RestoreIcon
-											onClick={() => handleResetChat()}
-										/>
+										<RestoreIcon />
 									</button>
 								</Tooltip>
 								<React.Fragment>
@@ -680,12 +695,9 @@ function App() {
 									<button
 										className="p-2 text-xl bg-slate-200 rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
 										disabled={loading}
+										onClick={() => sendMessage(userInput)}
 									>
-										<SendIcon
-											onClick={() =>
-												sendMessage(userInput)
-											}
-										/>
+										<SendIcon />
 									</button>
 								</Tooltip>
 							</div>
@@ -784,28 +796,42 @@ function App() {
 							{chatState &&
 								videoSelected.filter((selected) => selected)
 									.length === 3 &&
-								!uploadResults && (
-									<Button
-										component="label"
-										role={undefined}
-										variant="contained"
-										tabIndex={-1}
-										startIcon={<CloudUploadIcon />}
-										className="w-[350px] h-auto rounded-md"
-									>
-										Upload a Video of your own
-										<VisuallyHiddenInput
-											type="file"
-											onChange={(event) =>
-												handleFileUpload(
-													event.target.files[0]
-												)
-											}
-											accept="video/*"
-										/>
-									</Button>
+								!uploadedVideo && (
+									<div className="w-[350px] h-auto">
+										{!processingVideo && (
+											<Button
+												component="label"
+												role={undefined}
+												variant="contained"
+												tabIndex={-1}
+												startIcon={<CloudUploadIcon />}
+												className="w-[350px] h-full rounded-md"
+											>
+												Upload a Video of your own
+												<VisuallyHiddenInput
+													type="file"
+													onChange={(event) =>
+														handleFileUpload(
+															event.target
+																.files[0]
+														)
+													}
+													accept="video/*"
+												/>
+											</Button>
+										)}
+										{processingVideo && (
+											<div className="flex flex-col items-center justify-center w-full h-full">
+												<img
+													src={logo}
+													className="w-[50px] h-[50px] App-logo"
+													alt="logo"
+												/>
+											</div>
+										)}
+									</div>
 								)}
-							{chatState && uploadResults && (
+							{chatState && uploadedVideo && (
 								<div className="flex flex-col w-[350px] space-y-5 p-5 bg-gray-800 rounded-md border-2 border-green-200">
 									<div className="flex items-center justify-between">
 										<CloseIcon
@@ -814,18 +840,18 @@ function App() {
 										<Switch
 											checked={true}
 											className="ml-auto"
-											disable={true}
+											disabled={true}
 										/>
 									</div>
 									<video
 										controls
 										className="w-full max-h-[200px] rounded-md"
-										src={uploadedFileUrl}
+										src={uploadedVideo.link}
 									></video>
 									<small className="font-bold">
 										Relevancy Score:{" "}
 										<span className="font-normal">
-											{uploadResults.relevancy_score}
+											{uploadedVideo.relevancy_score}
 										</span>
 									</small>
 									<Accordion>
@@ -844,7 +870,7 @@ function App() {
 													Video:{" "}
 													<span className="font-normal">
 														{
-															uploadResults.video_context
+															uploadedVideo.video_context
 														}
 													</span>
 												</small>
@@ -852,7 +878,7 @@ function App() {
 													Audio:{" "}
 													<span className="font-normal">
 														{
-															uploadResults.audio_context
+															uploadedVideo.audio_context
 														}
 													</span>
 												</small>

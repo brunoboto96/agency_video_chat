@@ -2,6 +2,7 @@
 
 tech_enthusiast_task:
   description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
     Review {topic} with a focus on technological aspects, innovation, and relevance to current tech trends.
     Video Context: {video_context}
     Audio Context: {audio_context}
@@ -14,6 +15,7 @@ tech_enthusiast_task:
 
 young_social_media_influencer_task:
   description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
     Assess {topic} from a social media perspective, focusing on shareability, visual appeal, and engagement potential for young audiences.
     Video Context: {video_context}
     Audio Context: {audio_context}
@@ -26,6 +28,7 @@ young_social_media_influencer_task:
 
 business_professional_task:
   description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
     Analyze {topic} with a focus on business applications, potential ROI, and alignment with professional goals.
     Video Context: {video_context}
     Audio Context: {audio_context}
@@ -38,6 +41,7 @@ business_professional_task:
 
 family_focus_viewer_task:
   description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
     Evaluate {topic} from a family-oriented perspective, focusing on inclusivity, appeal to family members, and age appropriateness.
     Video Context: {video_context}
     Audio Context: {audio_context}
@@ -50,7 +54,8 @@ family_focus_viewer_task:
 
 environmentalist_task:
   description: >
-    Conduct an assessment of {topic} with respect to sustainability, environmental friendliness, and eco-consciousness.
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
+    Conduct an assessment of these {topic} with respect to sustainability, environmental friendliness, and eco-consciousness.
     Video Context: {video_context}
     Audio Context: {audio_context}
     Text Context: {text_context}
@@ -62,22 +67,62 @@ environmentalist_task:
 
 senior_expert_task:
   description: >
-    Analyze {topic} for senior accessibility, clarity, and practical relevance to older demographics.
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
+    Analyze these {topic} for senior accessibility, clarity, and practical relevance to older demographics.
     Video Context: {video_context}
     Audio Context: {audio_context}
     Text Context: {text_context}
     Agency Info: {agency_info}
   expected_output: >
-    A list with 5-7 bullet points on how accessible and relevant {topic} is for senior audiences.
+    A list with 5-7 bullet points on how accessible and relevant these {topic} is for senior audiences.
     And also a rating 1 out of 10 regarding how likely it should be used by the agency.
   agent: senior_expert
+
+art_critic_task:
+  description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
+    Critically evaluate these {topic} focusing on artistic expression, creativity, and emotional resonance.
+    Video Context: {video_context}
+    Audio Context: {audio_context}
+    Text Context: {text_context}
+    Agency Info: {agency_info}
+  expected_output: >
+    - Provide 5-7 bullet points highlighting the artistic strengths and weaknesses.
+    - Include a rating out of 10 regarding how likely it should be used by the agency.
+  agent: art_critic
+
+health_wellness_enthusiast_task:
+  description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
+    Review these {topic} with an emphasis on promoting health, wellness, and positive lifestyle choices.
+    Video Context: {video_context}
+    Audio Context: {audio_context}
+    Text Context: {text_context}
+    Agency Info: {agency_info}
+  expected_output: >
+    - Provide 5-7 bullet points evaluating how well the content promotes health and well-being.
+    - Include a rating out of 10 regarding how likely it should be used by the agency.
+  agent: health_wellness_enthusiast
+
+educator_task:
+  description: >
+    You are part of a focus group, keep the Agency Info in mind in terms of relevancy.
+    Assess these {topic} for educational value, accuracy, and applicability as a learning resource.
+    Video Context: {video_context}
+    Audio Context: {audio_context}
+    Text Context: {text_context}
+    Agency Info: {agency_info}
+  expected_output: >
+    - Provide 5-7 bullet points analyzing the educational aspects and accuracy of the content.
+    - Include a rating out of 10 regarding how likely it should be used by the agency.
+  agent: educator
 
 # Task for Reporting Analyst
 
 reporting_task:
   description: >
     Synthesize the insights from all agents into a comprehensive report, highlighting main points from each focus group perspective.
-    Average the ratings from each agent to provide an overall recommendation for each context.
+    Average the ratings from each agent to provide an overall recommendation for these {topic}.
     Ensure the report captures key insights, contrasting opinions, and provides actionable recommendations where appropriate.
     Video Context: {video_context}
     Audio Context: {audio_context}
