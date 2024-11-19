@@ -1,40 +1,73 @@
 import React, { useState, useEffect, useRef } from "react";
 import logo from "./logo.svg";
 import "./App.css";
-import Switch from "@mui/material/Switch";
+import {
+	Switch,
+	Tooltip,
+	Button,
+	Accordion,
+	AccordionSummary,
+	AccordionDetails,
+	Typography,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogContentText,
+	DialogTitle,
+} from "@mui/material";
+import {
+	Send as SendIcon,
+	Restore as RestoreIcon,
+	InterpreterMode as InterpreterModeIcon,
+	ArrowDownward as ArrowDownwardIcon,
+	CloudUpload as CloudUploadIcon,
+	Close as CloseIcon,
+} from "@mui/icons-material";
 import ReactMarkdown from "react-markdown";
-import Tooltip from "@mui/material/Tooltip";
-import SendIcon from "@mui/icons-material/Send";
-import RestoreIcon from "@mui/icons-material/Restore";
-import InterpreterModeIcon from "@mui/icons-material/InterpreterMode";
-import Button from "@mui/material/Button";
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import Typography from "@mui/material/Typography";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import CloseIcon from "@mui/icons-material/Close";
-
 import { styled } from "@mui/material/styles";
 
 function App() {
-	const [open, setOpen] = React.useState(false);
+	const [open, setOpen] = useState(false);
+	const [agencyName, setAgencyName] = useState("");
+	const [agencyDescription, setAgencyDescription] = useState("");
+	const [industry, setIndustry] = useState("");
+	const [location, setLocation] = useState("");
+	const [keywords, setKeywords] = useState("");
+	const [targetAudience, setTargetAudience] = useState("");
+	const [counter, setCounter] = useState(0);
+	const [loading, setLoading] = useState(false);
+	const [userInput, setUserInput] = useState("");
+	const [videoResults, setVideoResults] = useState(null);
+	const [chatMessages, setChatMessages] = useState([
+		{
+			role: "assistant",
+			content:
+				"Hi ! You have selected 3 videos. Would you like to chat about them? 💬 Or I could also run a focus group session to evaluate the selected videos from different perspectives. 🧐",
+		},
+	]);
+	const [chatState, setChatState] = useState(false);
+	const [videoSelected, setVideoSelected] = useState([]);
+	const [messageCounter, setMessageCounter] = useState(0);
+	const [timeLeft, setTimeLeft] = useState(140);
+	const [nrVideosToFetch, setNrVideosToFetch] = useState(6);
+	const [offsetNrVideosToFetch, setOffsetNrVideosToFetch] = useState(0);
+	const [offsetVideoLinks, setOffsetVideoLinks] = useState([]);
+	const [processingVideo, setProcessingVideo] = useState(false);
+	const [timesShuffled, setTimesShuffled] = useState(1);
+	const [uploadedFile, setUploadedFile] = useState(null);
+	const [uploadedFileUrl, setUploadedFileUrl] = useState(null);
+	const [uploadedVideo, setUploadedVideo] = useState(null);
 
-	const handleResetChat = () => {
-		console.log("reset chat");
-		setOpen(true);
-	};
+	const baseUrl = process.env.BACKEND_BASE_URL || "https://agency-video-chat-backend-wwsbodm2ma-nw.a.run.app";
+	const loadingMessages = [
+		"Collecting videos..",
+		"Analyzing data..",
+		"Generating insights..",
+		"Aggregating data..",
+		"Finishing up..",
+	];
 
-	const handleClose = () => {
-		setOpen(false);
-	};
+	const chatWindowRef = useRef(null);
 
 	const VisuallyHiddenInput = styled("input")({
 		clip: "rect(0 0 0 0)",
@@ -47,114 +80,26 @@ function App() {
 		whiteSpace: "nowrap",
 		width: 1,
 	});
-	// const [agencyName, setAgencyName] = useState("");
-	// const [agencyDescription, setAgencyDescription] = useState("");
-	// const [industry, setIndustry] = useState("");
-	// const [location, setLocation] = useState("");
-	// const [keywords, setKeywords] = useState("");
-	// const [targetAudience, setTargetAudience] = useState("");
-	const [agencyName, setAgencyName] = useState("FSRH");
-	const [agencyDescription, setAgencyDescription] = useState(
-		"Sexual and reproductive Healthcare membership organisation"
-	);
-	const [industry, setIndustry] = useState("Healthcare");
-	const [location, setLocation] = useState("UK");
-	const [keywords, setKeywords] = useState(
-		"healthcare, womens health, education and training, contraception, menopause, abortion"
-	);
-	const [targetAudience, setTargetAudience] = useState(
-		"Doctors, GPs, nurses, midwifes, pharmacists, nhs"
-	);
-	// const baseUrl = "http://localhost:8000";
-	const baseUrl = "https://agency-video-chat-backend-wwsbodm2ma-nw.a.run.app";
-	const [counter, setCounter] = useState(0);
-	const [loading, setLoading] = useState(false);
-	const loadingMessages = [
-		"Collecting videos..",
-		"Analyzing data..",
-		"Generating insights..",
-		"Aggregating data..",
-		"Finishing up..",
-	];
 
-	const [userInput, setUserInput] = useState("");
+	const handleResetChat = () => {
+		setOpen(true);
+	};
 
-	const [videoResults, setVideoResults] = useState(null);
-	const [welcomeMessage, setWelcomeMessage] = useState([
-		{
-			role: "assistant",
-			content:
-				"Hi " +
-				agencyName +
-				"! You have selected 3 videos. Would you like to chat about them? 💬 Or I could also run a focus group session to evaluate the selected videos from different perspectives. 🧐",
-		},
-	]);
-	const [chatMessages, setChatMessages] = useState(welcomeMessage);
-
-	const [chatState, setChatState] = useState(false);
-
-	const [videoSelected, setVideoSelected] = useState([]);
-
-	const [messageCounter, setMessageCounter] = useState(0);
-
-	const [timeLeft, setTimeLeft] = useState(140);
-
-	const [uploadResults, setUploadResults] = useState(null);
-
-	// Update the countdown every 1 second
-	useEffect(() => {
-		let interval;
-		if (loading && timeLeft > 0) {
-			interval = setInterval(() => {
-				setTimeLeft((prevTimeLeft) => prevTimeLeft - 1);
-			}, 1000);
-		}
-		return () => clearInterval(interval);
-	}, [loading, timeLeft]);
-
-	// Update the message counter every 20 seconds
-	useEffect(() => {
-		let messageInterval;
-		if (loading) {
-			messageInterval = setInterval(() => {
-				setMessageCounter(
-					(prevMessageCounter) =>
-						(prevMessageCounter + 1) % loadingMessages.length
-				);
-			}, 16000);
-		}
-		return () => clearInterval(messageInterval);
-	}, [loading]);
+	const handleClose = () => {
+		setOpen(false);
+	};
 
 	const startCountdown = () => {
 		setTimeLeft(140);
 		setMessageCounter(0);
 		setLoading(true);
 	};
-	const chatWindowRef = useRef(null);
-
-	useEffect(() => {
-		if (chatWindowRef.current) {
-			chatWindowRef.current.scrollTop =
-				chatWindowRef.current.scrollHeight;
-		}
-	}, [chatMessages]);
 
 	const stopCountdown = () => {
 		setLoading(false);
 	};
 
-	const [nrVideosToFetch, setNrVideosToFetch] = useState(6);
-	const [offsetNrVideosToFetch, setOffsetNrVideosToFetch] = useState(0);
-	const [offsetVideoLinks, setOffsetVideoLinks] = useState([]);
-	const [processingVideo, setProcessingVideo] = useState(false);
 	const handleSubmit = async () => {
-		console.log(
-			"nrVideosToFetch",
-			nrVideosToFetch,
-			"offsetNrVideosToFetch",
-			offsetNrVideosToFetch
-		);
 		const agencyInfo = {
 			agency_name: agencyName,
 			agency_description: agencyDescription,
@@ -166,11 +111,7 @@ function App() {
 		startCountdown();
 		try {
 			const response = await fetch(
-				baseUrl +
-					"/collect/videos?n=" +
-					nrVideosToFetch +
-					"&offset=" +
-					offsetNrVideosToFetch,
+				`${baseUrl}/collect/videos?n=${nrVideosToFetch}&offset=${offsetNrVideosToFetch}`,
 				{
 					method: "POST",
 					headers: {
@@ -195,7 +136,6 @@ function App() {
 					],
 				}));
 				setVideoSelected(new Array(data.videos.length).fill(false));
-				console.log("Success:", data);
 			} else {
 				stopCountdown();
 				console.error("Error:", response.statusText);
@@ -206,7 +146,6 @@ function App() {
 		}
 	};
 
-	// Toggle video selection
 	const toggleSelection = (index) => {
 		setVideoSelected((prevSelected) => {
 			const newSelected = [...prevSelected];
@@ -220,28 +159,16 @@ function App() {
 		const currentMessages = chatMessages;
 		setChatMessages((prevMessages) => [
 			...prevMessages,
-			{
-				role: "user",
-				content: message,
-			},
-			{
-				role: "assistant",
-				content: "💬 ..",
-			},
+			{ role: "user", content: message },
+			{ role: "assistant", content: "💬 .." },
 		]);
 		setUserInput("");
 
 		try {
-			console.log("Before sendMessage - videoResults:", videoResults);
-			// Create a deep copy of videoResults to prevent duplication
 			let videosToSend = videoResults
-				? {
-						...videoResults,
-						videos: [...videoResults.videos],
-				  }
+				? { ...videoResults, videos: [...videoResults.videos] }
 				: { videos: [] };
 
-			// Ensure uploadedVideo is added only once based on its unique link
 			if (
 				uploadedVideo &&
 				!videosToSend.videos.some((v) => v.link === uploadedVideo.link)
@@ -278,7 +205,6 @@ function App() {
 				}
 				stopCountdown();
 				setChatMessages(data);
-				console.log("Success:", data);
 			} else {
 				throw new Error(`Error: ${response.statusText}`);
 			}
@@ -289,9 +215,16 @@ function App() {
 	};
 
 	const resetChat = () => {
-		// Confirm dialog
 		setOpen(false);
-		setChatMessages(welcomeMessage);
+		setChatMessages([
+			{
+				role: "assistant",
+				content:
+					"Hi " +
+					agencyName +
+					"! You have selected 3 videos. Would you like to chat about them? 💬 Or I could also run a focus group session to evaluate the selected videos from different perspectives. 🧐",
+			},
+		]);
 	};
 
 	const startChat = () => {
@@ -303,29 +236,13 @@ function App() {
 		setChatState(true);
 	};
 
-	// // Replace '\n' with double spaces (for Markdown interpretation)
-	// const formatMessageForMarkdown = (messageContent) => {
-	// 	console.log("messageContent", messageContent);
-	// 	try {
-	// 		console.log(1);
-	// 		const finalmessage = messageContent.replace(/\n/g, "&nbsp;  ");
-	// 		console.log("finalmessage", finalmessage);
-	// 		return finalmessage;
-	// 	} catch (e) {
-	// 		console.log("error", e);
-	// 		return messageContent;
-	// 	}
-	// };
-
-	const [timesShuffled, setTimesShuffled] = useState(1);
 	const reshuffleVideos = () => {
 		const selectedVideos = videoResults.videos.filter(
 			(_, idx) => videoSelected[idx]
 		);
-
 		setVideoResults({ videos: selectedVideos });
 		const newLength = selectedVideos.length;
-		console.log("newLength", newLength);
+
 		setNrVideosToFetch(6 - newLength);
 		setOffsetVideoLinks(selectedVideos.map((video) => video.link));
 		setTimesShuffled(timesShuffled + 1);
@@ -339,12 +256,37 @@ function App() {
 		}
 	}, [nrVideosToFetch, offsetNrVideosToFetch]);
 
-	const [uploadedFile, setUploadedFile] = useState(null);
-	const [uploadedFileUrl, setUploadedFileUrl] = useState(null);
-	const [uploadedVideo, setUploadedVideo] = useState(null);
+	useEffect(() => {
+		let interval;
+		if (loading && timeLeft > 0) {
+			interval = setInterval(() => {
+				setTimeLeft((prev) => prev - 1);
+			}, 1000);
+		}
+		return () => clearInterval(interval);
+	}, [loading, timeLeft]);
 
 	useEffect(() => {
-		if (!uploadedFile) return; // Exit if no file is uploaded
+		let messageInterval;
+		if (loading) {
+			messageInterval = setInterval(() => {
+				setMessageCounter(
+					(prev) => (prev + 1) % loadingMessages.length
+				);
+			}, 16000);
+		}
+		return () => clearInterval(messageInterval);
+	}, [loading]);
+
+	useEffect(() => {
+		if (chatWindowRef.current) {
+			chatWindowRef.current.scrollTop =
+				chatWindowRef.current.scrollHeight;
+		}
+	}, [chatMessages]);
+
+	useEffect(() => {
+		if (!uploadedFile) return;
 
 		const uploadVideo = async () => {
 			try {
@@ -381,7 +323,6 @@ function App() {
 
 		uploadVideo();
 
-		// Cleanup: Revoke the object URL when the component unmounts or when a new file is uploaded
 		return () => {
 			if (uploadedFileUrl) {
 				URL.revokeObjectURL(uploadedFileUrl);
@@ -410,12 +351,12 @@ function App() {
 				Video Recommendation System
 			</h1>
 			<button
-				className="p-1 text-sm bg-slate-300 rounded-md  hover:bg-slate-400 text-slate-600 absolute top-0 right-0 mr-[30px] mt-1"
+				className="p-1 text-sm bg-slate-300 rounded-md hover:bg-slate-400 text-slate-600 absolute top-0 right-0 mr-[30px] mt-1"
 				onClick={() => window.location.reload()}
 			>
 				Restart
 			</button>
-			<div className="gap-4 rounded-md h-full w-full hover:shadow-xl flex bg-[#241f1f] px-3 ">
+			<div className="gap-4 rounded-md h-full w-full hover:shadow-xl flex bg-[#241f1f] px-3">
 				{!videoResults && (
 					<div className="flex flex-col text-center space-y-5 justify-center my-3 py-5 w-1/2 p-5 border rounded-md border-white">
 						<h1 className="text-center text-white text-2xl">
@@ -512,7 +453,7 @@ function App() {
 								)}
 								{counter === 5 && !loading && (
 									<button
-										className="p-5 text-2xl bg-blue-300 rounded-md rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
+										className="p-5 text-2xl bg-blue-300 rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
 										onClick={handleSubmit}
 										disabled={loading}
 									>
@@ -529,7 +470,7 @@ function App() {
 							Step 2: Video Selection
 						</h1>
 						<p className="!mb-20">
-							Select 3 videos of your preference or reshuflle the
+							Select 3 videos of your preference or reshuffle the
 							list.
 						</p>
 						<p className="text-white text-xl">
@@ -640,7 +581,6 @@ function App() {
 										}
 									}}
 								/>
-
 								<Tooltip title="Focus Group">
 									<button
 										className="p-2 text-xl bg-slate-200 rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
@@ -663,34 +603,29 @@ function App() {
 										<RestoreIcon />
 									</button>
 								</Tooltip>
-								<React.Fragment>
-									<Dialog
-										open={open}
-										onClose={handleClose}
-										aria-labelledby="alert-dialog-title"
-										aria-describedby="alert-dialog-description"
-									>
-										<DialogTitle id="alert-dialog-title">
-											{"Reset?"}
-										</DialogTitle>
-										<DialogContent>
-											<DialogContentText id="alert-dialog-description">
-												Do you want to reset this chat?
-											</DialogContentText>
-										</DialogContent>
-										<DialogActions>
-											<Button onClick={handleClose}>
-												No
-											</Button>
-											<Button
-												onClick={resetChat}
-												autoFocus
-											>
-												Yes
-											</Button>
-										</DialogActions>
-									</Dialog>
-								</React.Fragment>
+								<Dialog
+									open={open}
+									onClose={handleClose}
+									aria-labelledby="alert-dialog-title"
+									aria-describedby="alert-dialog-description"
+								>
+									<DialogTitle id="alert-dialog-title">
+										{"Reset?"}
+									</DialogTitle>
+									<DialogContent>
+										<DialogContentText id="alert-dialog-description">
+											Do you want to reset this chat?
+										</DialogContentText>
+									</DialogContent>
+									<DialogActions>
+										<Button onClick={handleClose}>
+											No
+										</Button>
+										<Button onClick={resetChat} autoFocus>
+											Yes
+										</Button>
+									</DialogActions>
+								</Dialog>
 								<Tooltip title="Send message">
 									<button
 										className="p-2 text-xl bg-slate-200 rounded-md w-[150px] hover:bg-slate-400 text-slate-600"
@@ -704,7 +639,7 @@ function App() {
 						</div>
 					</div>
 				)}
-				<div className="flex flex-col text-center space-y-5 justify-center border rounded-md border-white  my-3 w-1/2 p-5">
+				<div className="flex flex-col text-center space-y-5 justify-center border rounded-md border-white my-3 w-1/2 p-5">
 					{((!videoResults && !loading) || loading) && (
 						<img
 							src={logo}
@@ -723,14 +658,12 @@ function App() {
 								</h1>
 								<small>
 									{timeLeft > 0
-										? "Estimated time left: " +
-										  timeLeft +
-										  "s"
+										? `Estimated time left: ${timeLeft}s`
 										: ""}
+									{timeLeft <= 0 ? "Taking longer than expected due to a server cold start.." : ""}
 								</small>
 							</div>
 						)}
-
 					{videoResults && (
 						<div className="flex flex-wrap gap-10 overflow-y-auto">
 							{videoResults.videos.map((video, index) => (
@@ -801,9 +734,7 @@ function App() {
 										{!processingVideo && (
 											<Button
 												component="label"
-												role={undefined}
 												variant="contained"
-												tabIndex={-1}
 												startIcon={<CloudUploadIcon />}
 												className="w-[350px] h-full rounded-md"
 											>

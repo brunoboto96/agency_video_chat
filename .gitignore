@@ -63,3 +63,7 @@ yarn-error.log
 backend/chroma/*
 frontend/package.json
 backend/tmp/*.mp4
+backend/.env
+frontend/.env
+backend/audios/*.mp3
+backend/videos/*.mp4

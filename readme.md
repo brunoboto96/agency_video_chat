@@ -57,35 +57,32 @@ Follow these steps to set up the project locally:
 ### Steps
 
 1. **Clone the Repository**
-
    ```
    git clone https://github.com/brunoboto96/agency_video_chat.git
    cd agency_video_chat
    ```
 
-2.	Setup Backend
-
+2.	Set .env variables for frontend and backend
     ```
-    cd backend
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
-    pip install -r requirements.txt
+    cp backend/.env.example backend/.env
+    cp frontend/.env.example frontend/.env
     ```
 
-3.	Setup Frontend
+3.	Build and deploy using docker compose
     ```
-    cd ../frontend
-    npm install
+    make build
+    make up
     ```
-
-4.  Add your own env variables, instead of the get_secret() function in llm_functions.py
-
-5.	Run Docker Containers
-Ensure Docker is running, then:
+4. For more options
     ```
-    docker-compose up --build
+    make help
     ```
-
 
 ## TODO
-- Chromadb -> Update to storage bucket for file persistency
+1. The uploaded video generates a blob to display the url, so I can't use vqa unless I save the file, the problem is that it doesn't have any session identifier and I don't want to save videos of random people, but I also don't want to use auth.
+2. When saving the context in chromadb when its collecting, preventing double inference, saving resources, it doesn't update the agency_info context on the frontend state, but it stays in the message_history.
+3. Chromadb file its not persistent, could use a storage bucket to load and push changes dinamically, since its serverless atm or just use memory in order to be transient.
+4. Its not really doing RAG, so instead the agency info could be loaded this way.
+5. Create a Server-side session management, without auth to solve these problems and delete identifiable data once the user closes the window.
+6. Add pagination to video collection
+

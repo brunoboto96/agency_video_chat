@@ -1,7 +1,33 @@
+import os, logging, asyncio, time
+from dotenv import load_dotenv
+
+load_dotenv()
 from google.cloud import secretmanager
+from crewai import LLM, Agent, Crew, Process, Task
+from crewai.project import CrewBase, agent, crew, task
 
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-project_id = "583182365017"
+from video_analysis import analyse_video
+from db import chroma_client
+from audio_analysis import analyse_audio
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
+
+# Retrieve project ID from environment
+project_id = os.getenv("GCP_PROJECT_ID")
 
 
 def get_secret(name):
@@ -11,38 +37,29 @@ def get_secret(name):
     try:
         response = client.access_secret_version(name=secret_name)
         secret = response.payload.data.decode("UTF-8")
-
         return secret
     except Exception as e:
-        print("Error: ", e)
+        logger.error("Error accessing secret '%s': %s", name, e)
         raise e
 
 
-from crewai import LLM
-
-from crewai import Agent, Crew, Process, Task
-from crewai.project import CrewBase, agent, crew, task
-
+# Initialize LLM
 llm = LLM(
     model="gpt-4o-mini",
-    api_key=get_secret("openai_api_key"),
+    api_key=os.getenv("OPENAI_API_KEY") or get_secret("openai_api_key"),
 )
 
 
 @CrewBase
 class VideoFocusGroupCrew:
-    """VideoFocusGroup crew"""
+    """
+    Description: VideoFocusGroup crew
 
-    # tech_enthusiast
-    # young_social_media_influencer
-    # business_professional
-    # family_focus_viewer
-    # environmentalist
-    # senior_expert
-    # art_critic
-    # health_wellness_enthusiast
-    # educator
-    # reporting_analyst
+    Agents: [tech_enthusiast, young_social_media_influencer, business_professional,
+             family_focus_viewer, environmentalist, senior_expert, art_critic,
+             health_wellness_enthusiast, educator, reporting_analyst]
+    """
+
     @agent
     def tech_enthusiast(self) -> Agent:
         return Agent(
@@ -132,7 +149,7 @@ class VideoFocusGroupCrew:
             config=self.tasks_config["senior_expert_task"],
             async_execution=True,
         )
-        
+
     @agent
     def art_critic(self) -> Agent:
         return Agent(
@@ -140,14 +157,14 @@ class VideoFocusGroupCrew:
             verbose=True,
             llm=llm,
         )
-        
+
     @task
     def art_critic_task(self) -> Task:
         return Task(
             config=self.tasks_config["art_critic_task"],
             async_execution=True,
         )
-        
+
     @agent
     def health_wellness_enthusiast(self) -> Agent:
         return Agent(
@@ -162,7 +179,7 @@ class VideoFocusGroupCrew:
             config=self.tasks_config["health_wellness_enthusiast_task"],
             async_execution=True,
         )
-        
+
     @agent
     def educator(self) -> Agent:
         return Agent(
@@ -170,7 +187,7 @@ class VideoFocusGroupCrew:
             verbose=True,
             llm=llm,
         )
-        
+
     @task
     def educator_task(self) -> Task:
         return Task(
@@ -208,7 +225,7 @@ async def focus_group(
     video_context: list,
     audio_context: list,
     text_context: list,
-    topic_context: str = 'n videos',
+    topic_context: str = "n videos",
 ):
     """
     Docs: https://docs.crewai.com/introduction
@@ -216,7 +233,14 @@ async def focus_group(
     Description: A focus group is a qualitative research method that involves a group of people who are asked about their perceptions, opinions, beliefs, and attitudes towards a product, service, concept, advertisement, idea, or packaging. The focus group is led by a moderator who guides the discussion and ensures that all participants have an opportunity to express their views.
     """
 
-    print("Inputs:", agency_info, video_context, audio_context, text_context, topic_context)
+    logger.info(
+        "Inputs: agency_info=%s, video_context=%s, audio_context=%s, text_context=%s, topic_context=%s",
+        agency_info,
+        video_context,
+        audio_context,
+        text_context,
+        topic_context,
+    )
 
     inputs = {
         "topic": topic_context,
@@ -226,184 +250,177 @@ async def focus_group(
         "text_context": "",
     }
     response = VideoFocusGroupCrew().crew().kickoff(inputs=inputs)
-    print("Final Response:", response)
+    logger.info("Final Response: %s", response)
     return response.raw
 
 
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import asyncio
-from audio_analysis import analyse_audio
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-async def collect_videos(query: str, n: int, offset: int = 0):
+async def collect_videos(query: str, n: int, offset: int = 0) -> str:
     """
     Description: Find and collect videos that are relevant to the given agency information.
     """
-    videos_to_collect = n
-    n = n + offset
-    query = query.replace(" ", "%20")
-    query_builder = f"https://www.pexels.com/search/videos/{query}/"
+    n += offset
+    query_encoded = query.replace(" ", "%20")
+    query_builder = f"https://www.pexels.com/search/videos/{query_encoded}/"
 
-    chrome_options = Options()
-    # Updated headless mode configuration
-    chrome_options.add_argument("--headless=new")  # Use new headless mode
-    
-    # Additional required options for stable headless operation
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1920x1080")
-    
-    # Additional options to improve stability
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-notifications")
-    chrome_options.add_argument("--disable-infobars")
+    # Check if video links are already cached
+    logging.info("Checking cache for query: %s", query)
+    query_cache_collection = chroma_client.get_collection(name="video_query_cache")
+    cached_query = query_cache_collection.get(ids=[query])
+    video_elements = ""
+    if not cached_query["documents"]:
+        logging.info("Query '%s' not found in cache", query)
+        try:
+            chrome_options = Options()
+            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--window-size=1920x1080")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-notifications")
+            chrome_options.add_argument("--disable-infobars")
+            chrome_options.add_argument(
+                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
 
-    # Add user agent to avoid detection
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            # Initialize the Chrome driver
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            logger.info("Navigating to URL: %s", query_builder)
 
-    # Set up ChromeDriver Service with logging
-    service = Service(ChromeDriverManager().install())
-    driver = None
+            # Set timeout and load the page
+            driver.set_page_load_timeout(30)
+            driver.get(query_builder)
+
+            # Allow time for dynamic content to load
+            time.sleep(5)
+
+            # Scroll down to load more videos
+            scroll_pause_time = 2
+            screen_height = driver.execute_script("return window.screen.height;")
+            for i in range(1, 3):  # Scroll twice
+                driver.execute_script(f"window.scrollTo(0, {screen_height * i});")
+                logger.info("Scrolled to height: %d", screen_height * i)
+                time.sleep(scroll_pause_time)
+
+            # Wait for video elements to load
+            wait = WebDriverWait(driver, 20)
+            sources = wait.until(
+                EC.presence_of_all_elements_located((By.TAG_NAME, "video"))
+            )
+            video_elements = ",".join(
+                [source.get_attribute("src") for source in sources]
+            )
+
+            # Cache video links
+            query_cache_collection.add(
+                ids=[query],
+                documents=["video_cached"],
+                metadatas=[{"results": video_elements}],
+            )
+        except Exception as e:
+            logger.error("Error during video collection: %s", e)
+            return f"Error occurred: {str(e)}"
+        finally:
+            if "driver" in locals() and driver:
+                driver.quit()
+                logger.info("Browser session closed")
+    else:
+        logging.info("Query '%s' found in cache", query)
+        video_elements = cached_query["metadatas"][0]["results"]
 
     try:
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        print(f"Navigating to URL: {query_builder}")
-        
-        # Set page load timeout
-        driver.set_page_load_timeout(30)
-        driver.get(query_builder)
-
-        # Wait for initial page load
-        time.sleep(5)  # Allow time for dynamic content to load
-
-        # Scroll down to load more videos
-        scroll_pause_time = 2
-        screen_height = driver.execute_script("return window.screen.height;")
-        i = 1
-        
-        while i < 3:  # Adjust number of scrolls as needed
-            driver.execute_script(f"window.scrollTo(0, {screen_height * i});")
-            time.sleep(scroll_pause_time)
-            i += 1
-
-        # Wait for video elements with explicit wait
-        wait = WebDriverWait(driver, 20)
-        video_elements = wait.until(
-            EC.presence_of_all_elements_located((By.TAG_NAME, "video"))
-        )
-        
-        print(f"Found {len(video_elements)} video elements")
-        
         video_links = []
-        for source in video_elements[offset:n]:
-            if len(video_links) >= videos_to_collect:
-                break
-            try:
-                video_link = source.get_attribute("src")
-                if video_link:
-                    video_links.append(video_link)
-                    print(f"Found video link: {video_link}")
-            except Exception as e:
-                print(f"Error extracting video link: {str(e)}")
-                continue
+        video_links = video_elements.split(",")
+        video_links = video_links[offset:n]
 
         if not video_links:
-            print("No video links found")
+            logger.info("No video links found")
             return "No results found"
 
         # Process video links asynchronously
         video_analysis = await asyncio.gather(
             *[video_analyse(video_link) for video_link in video_links]
         )
-        print(f"Completed video analysis for {len(video_analysis)} videos")
+        logger.info("Completed video analysis for %d videos", len(video_analysis))
 
         return str(video_analysis)
 
     except Exception as e:
-        print(f"Error during video collection: {str(e)}")
+        logger.error("Error during video collection: %s", e)
         return f"Error occurred: {str(e)}"
 
     finally:
-        if driver:
+        if "driver" in locals() and driver:
             driver.quit()
-            print("Browser session closed")
+            logger.info("Browser session closed")
 
 
-
-from video_analysis import analyse_video
-from db import chroma_client
-
-
-async def video_analyse(video_link):
+async def video_analyse(video_link: str):
     """
     Placeholder for video analysis logic
     """
+    logger.info("Analyzing video link: %s", video_link)
 
-    print(f"Analyzing video link: {video_link}")
-
-    # check if video is already in the database
+    # Check if video is already in the database
     collection = chroma_client.get_collection(name="video_embeddings")
     results = collection.get(ids=[video_link])
 
-    if results['ids'] != []:
-        print("Video already in database", results)
+    if results["ids"]:
+        logger.info("Video already in database: %s", video_link)
         return results["metadatas"][0]
-    
 
-    video_context = await analyse_video(
-        video_link,
-        "Describe this video in detail and the style of editing and shooting.",
-    )
-    
-    audio_context = analyse_audio(video_link)
-    
-    response = {
-        "link": video_link,
-        "video_context": video_context,
-        "audio_context": audio_context,
-        "text_context": "",
-    }
-    # print('Video and audio analysis completed:', response)
-    collection.add(documents=[video_context], metadatas=[response], ids=[video_link])
-    return response
+    try:
+        video_context = await analyse_video(
+            video_link,
+            "Describe this video in detail and the style of editing and shooting.",
+        )
+        audio_context = await analyse_audio(video_link)
 
+        response = {
+            "link": video_link,
+            "video_context": video_context,
+            "audio_context": audio_context,
+            "text_context": "",
+        }
+        logger.info("Video and audio analysis completed: %s", response)
+        collection.add(
+            documents=[video_context], metadatas=[response], ids=[video_link]
+        )
+        return response
+    except Exception as e:
+        logger.error("Error analyzing video '%s': %s", video_link, e)
+        return {"link": video_link, "error": str(e)}
 
 
 async def analyse_videos(video_links: list, query: str) -> str:
     """
     Analyse a list of video links asynchronously
     """
+    logger.info("Analyzing video links: %s", video_links)
 
-    print(f"Analyzing video links: {video_links}")
+    try:
+        results = await asyncio.gather(
+            *[analyse_video(video_link, query) for video_link in video_links]
+        )
+        collection = chroma_client.get_collection(name="video_embeddings")
+        documents = collection.get(ids=video_links)
 
-    results = await asyncio.gather(
-        *[analyse_video(video_link, query) for video_link in video_links]
-    )
-    collection = chroma_client.get_collection(name="video_embeddings")
-    documents = collection.get(ids=video_links)
+        new_documents = []
+        for idx, result in enumerate(results):
+            new_documents.append(documents["documents"][idx] + result)
 
-    new_documents = []
-    for idx, result in enumerate(results):
-        # Grow the video_context with the result
-        new_documents.append(documents["documents"][idx] + result)
-    
-    # TODO: Add audio analysis
-    
-    # Update the documents in the collection with the new extended context
-    collection.update(
-        ids=video_links,
-        documents=[*new_documents],
-    )
-
-    return str(new_documents)
+        collection.update(
+            ids=video_links,
+            documents=new_documents,
+        )
+        logger.info("Updated video embeddings in the database")
+        return str(new_documents)
+    except Exception as e:
+        logger.error("Error during video analysis: %s", e)
+        return f"Error occurred: {str(e)}"
 
 
 tools = [
@@ -502,7 +519,7 @@ tools = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "keywords to search for relevant videos.",
+                        "description": "Keywords to search for relevant videos.",
                     },
                     "n": {
                         "type": "number",
@@ -548,9 +565,8 @@ tools = [
                 "additionalProperties": False,
             },
         },
-    }
+    },
 ]
-
 
 function_map = {
     "focus_group": focus_group,

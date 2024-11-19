@@ -1,17 +1,33 @@
-import json, re, os
-from llm_functions import *
-from openai import OpenAI
+import json, re, os, logging
+from dotenv import load_dotenv
+load_dotenv()
 from uuid import uuid4
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from llm_functions import function_map, tools, get_secret, analyse_video
+from openai import OpenAI
 
-os.environ.setdefault("REPLICATE_API_TOKEN", get_secret("REPLICATE_API_TOKEN"))
-client = OpenAI(
-    organization="org-88cYAMgEF0BLqHuvPB0LEphR",
-    project="proj_KfMHXeZRRa8G5CcVDMc981tP",
-    api_key=get_secret("openai_api_key"),
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
+
+os.environ.setdefault(
+    "REPLICATE_API_TOKEN",
+    os.getenv("REPLICATE_API_TOKEN") or get_secret("REPLICATE_API_TOKEN"),
 )
 
+client = OpenAI(
+    organization=os.getenv("OPENAI_ORG_ID"),
+    project=os.getenv("OPENAI_PROJECT_ID"),
+    api_key=os.getenv("OPENAI_API_KEY") or get_secret("openai_api_key"),
+)
 
-system_prompt = f"""
+system_prompt = """
 You are a friendly and insightful virtual assistant. Your role is to provide assistance as a digital brain. You have access to a wide range of tools and resources to help you provide accurate and helpful information to users. Your primary goal is to assist users in finding answers to their questions and guiding them through various tasks.
 
 Use the user’s media asset results to craft responses that are tailored to their unique profile.
@@ -33,17 +49,16 @@ async def chat(
     user_input: str = "",
     messages: list = [],
     not_chat=False,
-    additional_context=dict,
+    additional_context: dict = {},
 ):
-    print("user_input", user_input)
+    logger.info("user_input: %s", user_input)
     context_prompt = f"""
     Context:
 
     additional_context:
     {json.dumps(additional_context, indent=2)}
     """
-    # print('context_prompt', context_prompt)
-    if not_chat == False:
+    if not_chat is False:
         messages_return = [
             {"role": "system", "content": system_prompt},
             {"role": "system", "content": context_prompt},
@@ -63,17 +78,16 @@ async def chat(
             temperature=0.2,
         )
         message = response.choices[0].message
-        # print("message", message)
-        print("---")
+        logger.info("message", message)
+        logger.info("---")
 
         if message.tool_calls and len(message.tool_calls) > 0:
             function_call = message.tool_calls[0].function
             function_name = function_call.name
             function_args = json.loads(function_call.arguments)
-            # print(function_name, function_args)
+            logger.info("calling function: %s", function_name)
 
             if function_name in function_map:
-                print("calling function: ", function_name)
                 try:
                     function_result = await function_map[function_name](**function_args)
                     messages_return.append(
@@ -90,40 +104,26 @@ async def chat(
                             "content": function_result,
                         }
                     )
-                    # print("function result", function_result)
-
                 except Exception as e:
-                    print("Error in function call:", e)
+                    logger.error("Error in function call: %s", e)
                     messages_return.append(
                         {
                             "role": "assistant",
-                            "content": """I apologize for the inconvenience, but it seems, I couldn't complete that task. However, I can help you with insights or suggestions related to your agency.
-                            If you have any specific questions or need assistance with something else, please let me know! 😊""",
+                            "content": """I apologize for the inconvenience, but it seems I couldn't complete that task. However, I can help you with insights or suggestions related to your agency.
+If you have any specific questions or need assistance with something else, please let me know! 😊""",
                         }
                     )
                     return messages_return
             else:
-                print(f"Function {function_name} not found.")
+                logger.warning("Function %s not found.", function_name)
         else:
-            print("no function call")
-            print("_" * 50)
-            print(message.content)
-            print("_" * 50)
+            logger.info("no function call")
+            logger.info("%s", message.content)
             messages_return.append({"role": "assistant", "content": message.content})
             return messages_return
 
 
-## FastAPI
-
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from fastapi import File, UploadFile
-
-
 app = FastAPI()
-
 
 origins = ["*"]
 
@@ -135,6 +135,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class Message(BaseModel):
     message_history: list
     user_input: str
@@ -142,7 +143,6 @@ class Message(BaseModel):
 
 @app.get("/healthz")
 async def healthz():
-    # health check endpoint
     return {"message": "Hello I'm healthy!"}
 
 
@@ -166,11 +166,9 @@ async def video_file_analysis(video_file: UploadFile = File(...)):
         open(tmp_path, "rb"), "What is happening in this video?"
     )
 
-    # remove the temporary file
     os.remove(tmp_path)
 
     return {"output": output}
-
 
 
 class AgencyInfo(BaseModel):
@@ -179,7 +177,6 @@ class AgencyInfo(BaseModel):
 
 @app.post("/collect/videos")
 async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
-    print(agency, n)
     user_prompt = f"""
     ____
     The offset is:
@@ -212,7 +209,6 @@ async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
     final_response = res[-1]["content"]
 
     data = None
-    # Extract JSON string from the final response
     json_pattern = r"\{.*\}"
     match = re.search(json_pattern, final_response, re.DOTALL)
     if match:
@@ -220,8 +216,8 @@ async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
         try:
             data = json.loads(json_str)
         except json.JSONDecodeError as e:
-            print("Error parsing JSON:", e, final_response)
+            logger.error("Error parsing JSON: %s, response: %s", e, final_response)
     else:
-        print("No JSON found in the response.")
+        logger.error("No JSON found in the response.")
 
     return data
