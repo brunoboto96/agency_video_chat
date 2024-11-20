@@ -221,3 +221,6 @@ async def collect_videos(agency: AgencyInfo, n: int = 5, offset: int = 0):
         logger.error("No JSON found in the response.")
 
     return data
+
+
+logging.info("Server started")

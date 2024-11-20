@@ -1,7 +1,3 @@
-# docker-compose.yml
-
-version: "3.8"
-
 services:
   backend:
     build:
@@ -23,6 +19,24 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    depends_on:
+      - selenium
+
+  selenium:
+    image: selenium/standalone-chrome:latest
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    shm_size: '2gb'
+    platform: linux/amd64
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
   frontend:
     build:

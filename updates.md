@@ -81,5 +81,8 @@ Frontend + Backend fully functional ✅
 Dockerfiles created
 Hosted on Google Cloud Run
 
+## Update 7
+Using remote driver to connect to a selenium service. 
+Then use beautifulSoup4 with lxml for a fast parsing to grab the videos sources.
 
 [<- back to readme](https://github.com/brunoboto96/agency_video_chat/blob/main/readme.md)

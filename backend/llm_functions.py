@@ -14,6 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from bs4 import BeautifulSoup
 from video_analysis import analyse_video
 from db import chroma_client
 from audio_analysis import analyse_audio
@@ -254,6 +255,7 @@ async def focus_group(
     return response.raw
 
 
+
 async def collect_videos(query: str, n: int, offset: int = 0) -> str:
     """
     Description: Find and collect videos that are relevant to the given agency information.
@@ -269,49 +271,29 @@ async def collect_videos(query: str, n: int, offset: int = 0) -> str:
     video_elements = ""
     if not cached_query["documents"]:
         logging.info("Query '%s' not found in cache", query)
+        logging.info("Navigating to URL: %s", query_builder)
         try:
             chrome_options = Options()
-            chrome_options.add_argument("--headless=new")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--window-size=1920x1080")
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-notifications")
-            chrome_options.add_argument("--disable-infobars")
+            chrome_options.add_argument ('--no-sandbox') 
+            chrome_options.add_argument ('--headless-new')
+            chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.add_argument(
                 "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/120.0.0.0 Safari/537.36"
             )
 
-            # Initialize the Chrome driver
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            logger.info("Navigating to URL: %s", query_builder)
+            driver = webdriver.Remote(command_executor='http://selenium:4444' if os.getenv("SELENIUM_HOST") != 'localhost' else 'http://localhost:4444', options=chrome_options)
 
-            # Set timeout and load the page
             driver.set_page_load_timeout(30)
             driver.get(query_builder)
 
-            # Allow time for dynamic content to load
-            time.sleep(5)
+            soup_lxml = BeautifulSoup(driver.page_source, 'lxml')
 
-            # Scroll down to load more videos
-            scroll_pause_time = 2
-            screen_height = driver.execute_script("return window.screen.height;")
-            for i in range(1, 3):  # Scroll twice
-                driver.execute_script(f"window.scrollTo(0, {screen_height * i});")
-                logger.info("Scrolled to height: %d", screen_height * i)
-                time.sleep(scroll_pause_time)
+            sources = soup_lxml.find_all('video')
 
-            # Wait for video elements to load
-            wait = WebDriverWait(driver, 20)
-            sources = wait.until(
-                EC.presence_of_all_elements_located((By.TAG_NAME, "video"))
-            )
             video_elements = ",".join(
-                [source.get_attribute("src") for source in sources]
+                [source.get("src") for source in sources]
             )
 
             # Cache video links

@@ -50,7 +50,7 @@ Follow these steps to set up the project locally:
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/)
-- [Python 3.8+](https://www.python.org/downloads/)
+- [Python 3.10](https://www.python.org/downloads/)
 - [Docker](https://www.docker.com/get-started)
 - [Git](https://git-scm.com/)
 
