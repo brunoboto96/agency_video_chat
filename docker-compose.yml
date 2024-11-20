@@ -1,0 +1,51 @@
+# docker-compose.yml
+
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE_NAME}
+    env_file:
+      - ./backend/.env
+    ports:
+      - "${BACKEND_PORT}:8000"
+    restart: unless-stopped
+    shm_size: '2gb'
+    networks:
+      - app-network
+    volumes:
+      - ./backend:/backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${BASE_URL}:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ${FRONTEND_IMAGE_NAME}
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    restart: unless-stopped
+    environment:
+      - REACT_APP_BACKEND_BASE_URL=${BASE_URL}:${BACKEND_PORT}
+    networks:
+      - app-network
+    volumes:
+      - ./frontend:/frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${BASE_URL}:${FRONTEND_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  app-network:
+    driver: bridge
